@@ -80,3 +80,8 @@ def estimate_translation2d(moving, fixed=None, to3=True):
         _[1:, 1:] = affs
         affs = _
     return expand_dims(affs, 0)
+
+
+def apply_transform3d(mov, affs):
+    from scipy.ndimage.interpolation import affine_transform
+    return np.expand_dims(affine_transform(mov.squeeze(), affs.squeeze()), 0)
