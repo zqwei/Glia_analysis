@@ -65,14 +65,18 @@ def estimate_rigid2d(moving, fixed=None, affs=None, to3=True):
         _ = np.eye(4)
         _[1:, 1:] = affs
         affs = _
-    return affs
+    return expand_dims(affs, 0)
 
 
-def estimate_translation2d(moving, fixed=None):
+def estimate_translation2d(moving, fixed=None, to3=True):
     from fish_proc.imageRegistration.imTrans import ImAffine
     from numpy import expand_dims
     trans = ImAffine()
     trans.level_iters = [1000, 1000, 100]
     trans.ss_sigma_factor = 1.0
     affs = trans.estimate_translation2d(fixed.max(0), moving.squeeze().max(0)).affine
-    return affs
+    if to3:
+        _ = np.eye(4)
+        _[1:, 1:] = affs
+        affs = _
+    return expand_dims(affs, 0)
