@@ -3,14 +3,11 @@ import pandas as pd
 import os, sys
 from glob import glob
 from h5py import File
-from fish_proc.utils.memory import get_process_memory, clear_variables
 from fish_proc.utils.getCameraInfo import getCameraInfo
 
 cameraNoiseMat = '/groups/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
-cameraInfo = getCameraInfo(dir_root)
 
-
-def pixelDenoiseImag(img, cameraInfo=cameraInfo):
+def pixelDenoiseImag(img, cameraInfo=None):
     from fish_proc.pixelwiseDenoising.simpleDenioseTool import simpleDN
     from scipy.ndimage.filters import median_filter
     win_ = 3
@@ -28,14 +25,54 @@ def pixelDenoiseImag(img, cameraInfo=cameraInfo):
     return median_filter(simpleDN(img, offset=offset_, gain=gain_), size=filter_win)
 
 
-def estimate_rigid3d(moving, fixed=None):
+def estimate_rigid3d(moving, fixed=None, affs=None):
     from fish_proc.imageRegistration.imTrans import ImAffine
     from numpy import expand_dims
     trans = ImAffine()
     trans.level_iters = [1000, 1000, 100]
     trans.ss_sigma_factor = 1.0
-    affs = trans.estimate_rigid3d(fixed, moving.squeeze()).affine
+    affs = trans.estimate_rigid3d(fixed, moving.squeeze(), tx_tr=affs).affine
     return expand_dims(affs, 0)
 
 
-def apply_rigid3d():
+def estimate_rigid3d_affine(moving, fixed=None, affs=None):
+    from fish_proc.imageRegistration.imTrans import ImAffine
+    from numpy import expand_dims
+    trans = ImAffine()
+    trans.level_iters = [1000, 1000, 100]
+    trans.ss_sigma_factor = 1.0
+    return trans.estimate_rigid3d(fixed, moving.squeeze(), tx_tr=affs)
+
+
+def estimate_translation3d(moving, fixed=None):
+    from fish_proc.imageRegistration.imTrans import ImAffine
+    from numpy import expand_dims
+    trans = ImAffine()
+    trans.level_iters = [1000, 1000, 100]
+    trans.ss_sigma_factor = 1.0
+    affs = trans.estimate_translation3d(fixed, moving.squeeze()).affine
+    return expand_dims(affs, 0)
+
+
+def estimate_rigid2d(moving, fixed=None, affs=None, to3=True):
+    from fish_proc.imageRegistration.imTrans import ImAffine
+    from numpy import expand_dims
+    trans = ImAffine()
+    trans.level_iters = [1000, 1000, 100]
+    trans.ss_sigma_factor = 1.0
+    affs = trans.estimate_rigid2d(fixed.max(0), moving.squeeze().max(0), tx_tr=affs).affine
+    if to3:
+        _ = np.eye(4)
+        _[1:, 1:] = affs
+        affs = _
+    return affs
+
+
+def estimate_translation2d(moving, fixed=None):
+    from fish_proc.imageRegistration.imTrans import ImAffine
+    from numpy import expand_dims
+    trans = ImAffine()
+    trans.level_iters = [1000, 1000, 100]
+    trans.ss_sigma_factor = 1.0
+    affs = trans.estimate_translation2d(fixed.max(0), moving.squeeze().max(0)).affine
+    return affs
