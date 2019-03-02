@@ -91,3 +91,20 @@ def apply_transform3d(mov, affs):
     print(mov.squeeze().shape)
     print(affs.squeeze().shape)
     return np.expand_dims(affine_transform(mov.squeeze(), affs.squeeze()), 0)
+
+
+def save_h5(filename, data, dtype='float32'):
+    with File(filename, 'w') as f:
+        f.create_dataset('default', data=data.astype(dtype), compression='gzip', chunks=True, shuffle=True)
+        f.close()
+        
+
+def save_h5_rescale(filename, data, reset_max_int=65535):
+    ## np.iinfo(np.uint16).max = 65535
+    with File(filename, 'w') as f:
+        data_max = data.max()
+        data_min = data.min()
+        data = (data - data_min)/(data_max - data_min)*reset_max_int
+        f.create_dataset('default', data=data.astype(np.uint16), compression='gzip', chunks=True, shuffle=True)
+        f.create_dataset('scale', data=np.array([data_min, data_max]), chunks=True, shuffle=True)
+        f.close()
