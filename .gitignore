@@ -2,6 +2,8 @@
 depreciated*
 dask*
 *.npy
+info
+*data*/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

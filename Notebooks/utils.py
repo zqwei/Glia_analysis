@@ -59,6 +59,8 @@ def estimate_rigid2d(moving, fixed=None, affs=None, to3=True):
     from numpy import expand_dims
     trans = ImAffine()
     trans.level_iters = [1000, 1000, 100]
+    trans.factors = [8, 4, 2]
+    trans.sigmas = [3.0, 2.0, 1.0]
     trans.ss_sigma_factor = 1.0
     affs = trans.estimate_rigid2d(fixed.max(0), moving.squeeze().max(0), tx_tr=affs).affine
     if to3:
@@ -74,6 +76,8 @@ def estimate_translation2d(moving, fixed=None, to3=True):
     trans = ImAffine()
     trans.level_iters = [1000, 1000, 100]
     trans.ss_sigma_factor = 1.0
+    trans.factors = [8, 4, 2]
+    trans.sigmas = [3.0, 1.0, 1.0]
     affs = trans.estimate_translation2d(fixed.max(0), moving.squeeze().max(0)).affine
     if to3:
         _ = np.eye(4)
@@ -84,4 +88,6 @@ def estimate_translation2d(moving, fixed=None, to3=True):
 
 def apply_transform3d(mov, affs):
     from scipy.ndimage.interpolation import affine_transform
+    print(mov.squeeze().shape)
+    print(affs.squeeze().shape)
     return np.expand_dims(affine_transform(mov.squeeze(), affs.squeeze()), 0)
