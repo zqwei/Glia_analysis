@@ -1,5 +1,5 @@
 # Project ignore files
-depreciated*
+depreciated*/
 dask*
 *.npy
 info
