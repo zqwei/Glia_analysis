@@ -29,7 +29,7 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20):
       1. pixel denoise
       2. registration -- save registration file
       3. detrend using percentile baseline
-      4. local pca demix
+      4. local pca denoise
     '''
     import fish_proc.utils.dask_ as fdask
     from fish_proc.utils.getCameraInfo import getCameraInfo
@@ -83,11 +83,54 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20):
     g = da.overlap.overlap(Y_d, depth={1: xy_lap, 2: xy_lap}, boundary={1: 0, 2: 0})
     Y_svd = g.map_blocks(local_pca, dtype='float32')
     Y_svd = da.overlap.trim_internal(Y_svd, {1: xy_lap, 2: xy_lap})
-    
-    if os.path.exists(f'{save_root}/local_pca_data.zarr'):
-        shutil.rmtree(f'{save_root}/local_pca_data.zarr')
     Y_svd.to_zarr(f'{save_root}/local_pca_data.zarr')
     cluster.stop_all_jobs()
     return None
 
 
+def demix_cells(save_root, dt=5):
+    '''
+      1. local pca denoise
+      2. cell segmentation
+    '''
+    import fish_proc.utils.dask_ as fdask
+    import dask.array as da
+    
+    Y_svd = da.from_zarr(f'{save_root}/local_pca_data.zarr')
+    mov = Y_svd_[:, :, :, ::dt]
+    mov = mov.rechunk((1, -1, -1, -1))
+    numCores = mov.shape[0]    
+    cluster, client = fdask.setup_workers(numCores)
+    
+    
+    return None
+
+    
+def compute_cell_dff(save_root, numCores=20, window=100, percentile=20):
+    '''
+      1. local pca denoise (\delta F signal)
+      2. baseline
+      3. Cell weight matrix apply to denoise and baseline
+      4. dff
+    '''
+    import fish_proc.utils.dask_ as fdask
+    from fish_proc.utils.getCameraInfo import getCameraInfo
+    import dask.array as da    
+    
+    # set worker
+    cluster, client = fdask.setup_workers(numCores)    
+    files = sorted(glob(dir_root+'/*.h5'))
+    chunks = File(files[0],'r')['default'].shape
+    data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
+    # pixel denoise
+    cameraInfo = getCameraInfo(dir_root)
+    denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraInfo=cameraInfo))
+    trans_affine_ = np.load(f'{save_root}/trans_affs.npy')
+    trans_affine_ = da.from_array(trans_affine_, chunks=(1,4,4))
+    # apply affine transform
+    trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
+    # baseline
+    chunk_x, chunk_y = chunks[-2:]
+    trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunk_x//4, chunk_y//4, -1))
+    baseline_t = trans_data_t.map_blocks(lambda v: baseline(v, window=window, percentile=percentile), dtype='float32')
+    return None
