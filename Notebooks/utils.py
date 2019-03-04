@@ -140,10 +140,28 @@ def baseline(data, window=100, percentile=15, downsample=1, axis=-1):
         baseline_ds = percentile_filter(data_ds, percentile=percentile, size=size)
         interper = interp1d(range(0, data.shape[axis], downsample), baseline_ds, axis=axis, fill_value='extrapolate')
         bl = interper(range(data.shape[axis]))
-
     return bl
 
 
 def robust_sp_trend(mov):
     from fish_proc.denoiseLocalPCA.detrend import trend
     return trend(mov)
+
+
+# test code for local_pca
+def local_pca_test(block, block_id=None):
+    # this check number of cpus can be used on each worker
+    import multiprocess as mp
+    return np.ones([1]*len(block_id))*mp.cpu_count()
+
+
+def local_pca(block, block_id=None):
+    from fish_proc.denoiseLocalPCA.denoise import temporal as svd_patch
+    from numpy import expand_dims
+    dx=4
+    nblocks=[20, 20]
+    if np.prod(block.shape) == 1:
+        Y_svd = block[0]
+    else:
+        Y_svd, _ = svd_patch(block.squeeze(), nblocks=nblocks, dx=dx, stim_knots=None, stim_delta=0, is_single_core=True)
+    return expand_dims(Y_svd, 0)
