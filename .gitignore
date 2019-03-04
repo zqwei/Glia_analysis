@@ -5,6 +5,7 @@ dask*
 info
 *data*/
 *.h5
+*.zarr/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
