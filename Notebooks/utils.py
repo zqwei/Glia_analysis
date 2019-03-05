@@ -165,3 +165,22 @@ def local_pca(block, block_id=None):
     else:
         Y_svd, _ = svd_patch(block.squeeze(), nblocks=nblocks, dx=dx, stim_knots=None, stim_delta=0, is_single_core=True)
     return expand_dims(Y_svd, 0)
+
+
+# mask functions
+def intesity_mask(blocks, percentile=40):
+    return blocks>np.percentile(blocks, percentile)
+
+
+def snr_mask(Y_svd, std_per=20, snr_per=10):    
+    Y_svd = Y_svd.squeeze()
+    d1, d2, _ = Y_svd.shape
+    mean_ = Y_svd.mean(axis=-1,keepdims=True)
+    sn, _ = get_noise_fft(Y_svd - mean_,noise_method='logmexp')
+    SNR_ = Y_svd.var(axis=-1)/sn**2    
+    Y_d_std = Y_svd.std(axis=-1)
+    std_thres = np.percentile(Y_d_std.ravel(), std_per)
+    mask = Y_d_std<=std_thres
+    snr_thres = np.percentile(np.log(SNR_).ravel(), snr_per)
+    mask = np.logical_or(mask, np.log(SNR_)<snr_thres)
+    return mask.squeeze()
