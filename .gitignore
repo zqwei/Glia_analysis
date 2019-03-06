@@ -7,6 +7,7 @@ info
 *.h5
 *.zarr/
 *.txt
+*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
