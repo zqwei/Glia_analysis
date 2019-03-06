@@ -3,7 +3,6 @@ import pandas as pd
 import os, sys
 from glob import glob
 from h5py import File
-import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings('ignore')
 import dask.array as da
@@ -146,7 +145,49 @@ def demix_cells(save_root, nsplit = 8, numCores = 200):
     return None
 
 
-def compute_cell_dff(save_root, numCores=20, window=100, percentile=20):
+def check_demix_cells(save_root, block_id, nsplit=8, plot_global=True):
+    import matplotlib.pyplot as plt
+    import pickle
+    Y_d_ave_ = da.from_array(File(f'{save_root}/Y_2dnorm_ave.h5', 'r')['default'], chunks=(1, -1, -1, -1))
+    mask_ = da.from_array(File(f'{save_root}/mask_map.h5', 'r')['default'], chunks=(1, -1, -1, -1))
+    Cn_list = File(f'{save_root}/local_correlation_map.h5', 'r')['default'].value
+    _, xdim, ydim = Cn_list.shape
+    Cn_list = da.from_array(np.expand_dims(Cn_list, -1), chunks=(1, xdim//nsplit, ydim//nsplit, -1))
+    Y_d_ave_ = Y_d_ave_.rechunk((1, xdim//nsplit, ydim//nsplit, -1))
+    mask_ = mask_.rechunk((1, xdim//nsplit, ydim//nsplit, -1))
+    v_max = np.percentile(Y_d_ave_, 90)
+    fname = f'{save_root}/demix_rlt/period_Y_demix_block_'
+    for _ in block_id:
+        fname += '_'+str(_)
+    if os.path.exists(fname+'_rlt.pkl'):
+        with open(fname+'_rlt.pkl', 'rb') as f:
+            try:
+                rlt_ = pickle.load(f)
+                A = rlt_['fin_rlt']['a']
+                A_ = A[:, (A>0).sum(axis=0)>40]
+                A_comp = np.zeros(A_.shape[0])
+                A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + 1
+                plt.imshow(Y_d_ave_block.squeeze(), cmap=plt.cm.gray)
+                plt.imshow(A_comp.reshape(ydim//nsplit, xdim//nsplit).T, cmap=plt.cm.nipy_spectral_r, alpha=0.7)
+                plt.axis('off')
+                plt.show()
+            except:
+                print('None components')
+    plt.imshow(Y_d_ave_block.squeeze())
+    plt.axis('off')
+    plt.show()
+    if plot_global:
+        area_mask = np.zeros((xdim, ydim)).astype('bool')
+        area_mask[block_id[1]*x_:block_id[1]*x_+x_, block_id[2]*y_:block_id[2]*y_+y_]=True
+        plt.figure(figsize=(16, 16))
+        plt.imshow(Y_d_ave_[block_id[0]].squeeze(), vmax=v_max)
+        plt.imshow(area_mask, cmap='gray', alpha=0.3)
+        plt.axis('off')
+        plt.show()
+    return None
+
+
+def compute_cell_dff(dir_root, save_root, numCores=20, window=100, percentile=20):
     '''
       1. local pca denoise (\delta F signal)
       2. baseline
