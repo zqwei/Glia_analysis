@@ -95,7 +95,7 @@ def mask_brain(save_root, percentile=40, dt=5, numCores=20, is_skip_snr=True, sa
     Y_d_ave_ = da.from_array(File(f'{save_root}/Y_2dnorm_ave.h5', 'r')['default'], chunks=(1, -1, -1, -1))
     Y_svd_ = da.from_zarr(f'{save_root}/local_pca_data.zarr')
     Y_svd_ = Y_svd_.rechunk((1, -1, -1, -1))
-    mask_ave_ =  Y_d_ave_.map_blocks(lambda: v: intesity_mask(v, percentile=percentile), dtype='bool').compute()
+    mask_ave_ =  Y_d_ave_.map_blocks(lambda v: intesity_mask(v, percentile=percentile), dtype='bool').compute()
     mask_snr = mask_ave_.copy().squeeze(axis=-1) #drop last dim
     Cn_list = np.zeros(mask_ave_.shape).squeeze(axis=-1) #drop last dim
     for ii in range(Y_svd_.shape[0]):
