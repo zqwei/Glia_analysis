@@ -219,7 +219,6 @@ def compute_cell_dff_raw(dir_root, save_root, numCores=20, window=100, percentil
       3. Cell weight matrix apply to denoise and baseline
       4. dff
     '''
-
     # set worker
     cluster, client = fdask.setup_workers(numCores)
     files = sorted(glob(dir_root+'/*.h5'))
@@ -246,7 +245,7 @@ def compute_cell_dff_NMF(dir_root, save_root, numCores=20, window=100, percentil
       3. Cell weight matrix apply to denoise and baseline
       4. dff
     '''
-    
+
     # set worker
     cluster, client = fdask.setup_workers(numCores)
     files = sorted(glob(dir_root+'/*.h5'))
@@ -267,6 +266,7 @@ def compute_cell_dff_NMF(dir_root, save_root, numCores=20, window=100, percentil
 
 
 if __name__ == '__main__':
-    dir_root = '/nrs/ahrens/Yu/SPIM/active_dataset/glia_neuron_imaging/20161109/fish2/20161109_2_1_6dpf_GFAP_GC_Huc_RG_GA_CL_fb_OL_f0_0GAIN_20161109_211950/raw'
-    save_root = '.'
-    preprocessing(dir_root, save_root, numCores=100, window=1000, percentile=20)
+    # dir_root = '/nrs/ahrens/Yu/SPIM/active_dataset/glia_neuron_imaging/20161109/fish2/20161109_2_1_6dpf_GFAP_GC_Huc_RG_GA_CL_fb_OL_f0_0GAIN_20161109_211950/raw'
+    # save_root = '.'
+    # preprocessing(dir_root, save_root, numCores=100, window=1000, percentile=20)
+    print('------')
