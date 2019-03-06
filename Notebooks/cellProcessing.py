@@ -125,19 +125,24 @@ def mask_brain(save_root, percentile=40, dt=5, numCores=20, is_skip_snr=True, sa
     time.sleep(10)
     return None
 
-def demix_cells(save_root, nsplit = 8):
+def demix_cells(save_root, nsplit = 8, numCores = 200):
     '''
       1. local pca denoise
       2. cell segmentation
     '''
-    from dask.distributed import Client
-    client = Client("tcp://127.0.0.1:34316")
+    import fish_proc.utils.dask_ as fdask
+    cluster, client = fdask.setup_workers(numCores)
+    print(client)
     Y_svd_ = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
     Cn_list = File(f'{save_root}/local_correlation_map.h5', 'r')['default'].value
-    Cn_list = da.from_array(np.expand_dims(Cn_list, -1), chunks=(1, -1, -1, -1))
-    Y_svd_ = Y_svd_.rechunk((1, -1, -1, -1))
-    da.map_blocks(demix_middle_data_with_mask, Y_svd_, Cn_list, chunks=(1, 1, 1, 1), dtype='int8').compute(scheduler='threads')
+    _, xdim, ydim = Cn_list.shape
+    Cn_list = da.from_array(np.expand_dims(Cn_list, -1), chunks=(1, xdim//nsplit, ydim//nsplit, -1))
+    Y_svd_ = Y_svd_.rechunk((1, xdim//nsplit, ydim//nsplit, -1))
+    if not os.path.exists(f'{save_root}/demix_rlt/'):
+        os.mkdir(f'{save_root}/demix_rlt/')
+    da.map_blocks(lambda a, b:demix_blocks(a, b, save_folder=save_root), Y_svd_, Cn_list, chunks=(1, 1, 1, 1), dtype='int8').compute()
     cluster.stop_all_jobs()
+    cluster.close()
     return None
 
 
