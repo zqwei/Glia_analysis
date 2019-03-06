@@ -190,3 +190,57 @@ def mask_blocks(block, mask=None):
     _ = block.copy()
     _[~mask] = 0
     return _
+
+
+def demix_blocks(block, Cblock, save_folder='.', block_id=None):
+    import pickle
+    import sys
+    from fish_proc.demix import superpixel_analysis as sup
+    is_demix = False
+    orig_stdout = sys.stdout
+    
+    fname = f'{save_folder}/demix_rlt/period_Y_demix_block_'
+    for _ in block_id:
+        fname += '_'+str(_)
+        
+    f = open(fname+'_info.txt', 'w')
+    sys.stdout = f
+    
+    if (Cblock>0).sum()==0:
+        print('No components in this block', flush=True)
+        sys.stdout = orig_stdout
+        f.close()
+        return np.zeros([1]*4)
+    
+    if (Cblock[Cblock>0]>0.90).mean()<0.5:
+        cut_off_point=np.percentile(Cblock.ravel(), [99, 95, 85, 65])
+    else:
+        cut_off_point = np.array([0.99, 0.95, 0.90])
+    pass_num_max = (cut_off_point>0).sum()
+    cut_off_point = cut_off_point[:pass_num_max]
+    print(cut_off_point, flush=True)
+    pass_num = pass_num_max
+    while not is_demix and pass_num>=0:
+        try:
+            rlt_= sup.demix_whole_data(block.squeeze(), cut_off_point[pass_num_max-pass_num:], length_cut=[20,15,15,15],
+                                       th=[1,1,1,1], pass_num=pass_num, residual_cut = [0.6,0.6,0.6,0.6],
+                                       corr_th_fix=0.3, max_allow_neuron_size=0.3, merge_corr_thr=cut_off_point[-1],
+                                       merge_overlap_thr=0.6, num_plane=1, patch_size=[20, 20], plot_en=False,
+                                       TF=False, fudge_factor=1, text=False, bg=False, max_iter=50,
+                                       max_iter_fin=100, update_after=10) 
+            is_demix = True
+        except:
+            print(f'fail at pass_num {pass_num}', flush=True)
+            is_demix = False
+            pass_num -= 1
+            
+    sys.stdout = orig_stdout
+    f.close()
+    
+    try:    
+        with open(fname+'_rlt.pkl', 'wb') as f:
+            pickle.dump(rlt_, f)
+    except:
+        pass
+
+    return np.zeros([1]*4)
