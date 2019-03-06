@@ -184,3 +184,9 @@ def snr_mask(Y_svd, std_per=20, snr_per=10):
     snr_thres = np.percentile(np.log(SNR_).ravel(), snr_per)
     mask = np.logical_or(mask, np.log(SNR_)<snr_thres)
     return mask.squeeze()
+
+
+def mask_blocks(block, mask=None):
+    _ = block.copy()
+    _[~mask] = 0
+    return _
