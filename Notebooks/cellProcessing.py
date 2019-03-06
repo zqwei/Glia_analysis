@@ -32,27 +32,27 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20):
     '''
     import fish_proc.utils.dask_ as fdask
     from fish_proc.utils.getCameraInfo import getCameraInfo
-    import dask.array as da    
-    
+    import dask.array as da
+
     # set worker
     cluster, client = fdask.setup_workers(numCores)
     print(client)
-    
+
     files = sorted(glob(dir_root+'/*.h5'))
     chunks = File(files[0],'r')['default'].shape
     data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
-    
+
     # pixel denoise
     cameraInfo = getCameraInfo(dir_root)
     denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraInfo=cameraInfo))
-    
+
     # save and compute reference image
     if not os.path.exists(f'{save_root}/motion_fix_.h5'):
         med_win = len(denoised_data)
         ref_img = denoised_data[med_win-10:med_win+10].mean(axis=0).compute()
         save_h5(f'{save_root}/motion_fix_.h5', ref_img, dtype='float16')
         refresh_workers(cluster, numCores=numCores)
-    
+
     # compute affine transform
     if not os.path.exists(f'{save_root}/trans_affs.npy'):
         ref_img = File(f'{save_root}/motion_fix_.h5', 'r')['default'].value
@@ -64,20 +64,20 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20):
     else:
         trans_affine_ = np.load(f'{save_root}/trans_affs.npy')
         trans_affine_ = da.from_array(trans_affine_, chunks=(1,4,4))
-    
+
     # apply affine transform
     trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
-    
+
     # compute detrend data
     chunk_x, chunk_y = chunks[-2:]
     trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunk_x//4, chunk_y//4, -1))
     Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
-    
+
     # remove meaning before svd (-- pca)
     Y_d_ave = Y_d.mean(axis=-1, keepdims=True, dtype='float32')
-    save_h5(f'{save_dir}Y_2dnorm_ave.h5', Y_d_ave.compute(), dtype='float32')
-    
-    # local pca on overlap blocks 
+    save_h5(f'{save_root}/Y_2dnorm_ave.h5', Y_d_ave.compute(), dtype='float32')
+
+    # local pca on overlap blocks
     Y_d = Y_d - Y_d_ave
     xy_lap = 4 # overlap by 10 pixel in blocks
     g = da.overlap.overlap(Y_d, depth={1: xy_lap, 2: xy_lap}, boundary={1: 0, 2: 0})
@@ -89,17 +89,17 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20):
     return None
 
 
-def mask_brain(save_root, dt=5, numCores=20, is_skip_snr=True):
+def mask_brain(save_root, percentile=40, dt=5, numCores=20, is_skip_snr=True, save_masked_data=True):
     import fish_proc.utils.dask_ as fdask
     from fish_proc.utils.snr import correlation_pnr
     from fish_proc.utils.noise_estimator import get_noise_fft
     import dask.array as da
     cluster, client = fdask.setup_workers(numCores)
     print(client)
-    Y_d_ave_ = da.from_array(File(f'{save_dir}Y_2dnorm_ave.h5', 'r')['default'], chunks=(1, -1, -1, -1))
+    Y_d_ave_ = da.from_array(File(f'{save_root}/Y_2dnorm_ave.h5', 'r')['default'], chunks=(1, -1, -1, -1))
     Y_svd_ = da.from_zarr(f'{save_root}/local_pca_data.zarr')
     Y_svd_ = Y_svd_.rechunk((1, -1, -1, -1))
-    mask_ave_ =  Y_d_ave_.map_blocks(intesity_mask).compute()
+    mask_ave_ =  Y_d_ave_.map_blocks(lambda: v: intesity_mask(v, percentile=percentile), dtype='bool').compute()
     mask_snr = mask_ave_.copy().squeeze(axis=-1) #drop last dim
     Cn_list = np.zeros(mask_ave_.shape).squeeze(axis=-1) #drop last dim
     for ii in range(Y_svd_.shape[0]):
@@ -114,14 +114,18 @@ def mask_brain(save_root, dt=5, numCores=20, is_skip_snr=True):
     mask = mask_ave_ & np.expand_dims(mask_snr, -1)
     save_h5(f'{save_root}/mask_map.h5', mask, dtype='bool')
     save_h5(f'{save_root}/local_correlation_map.h5', Cn_list, dtype='float32')
+    Y_svd_ = Y_svd_.rechunk((-1, -1, -1, 1))
+    _ = Y_svd_.map_blocks(lambda v: mask_blocks(v, mask=mask), dtype='float32')
     refresh_workers(cluster, numCores=numCores)
-    Y_svd_[~da.from_array(mask, chunks=(1, -1, -1, -1))] = 0
-    Y_svd_[:, :, :, ::dt].to_zarr(f'{save_root}/masked_local_pca_data.zarr')
+    if save_masked_data:
+        _.to_zarr(f'{save_root}/masked_local_pca_data.zarr', overwrite=True)
+        refresh_workers(cluster, numCores=numCores)
+    _[:, :, :, ::dt].to_zarr(f'{save_root}/masked_downsampled_local_pca_data.zarr')
     cluster.stop_all_jobs()
     time.sleep(10)
     return None
 
-def demix_cells(save_root):
+def demix_cells(save_root, nsplit = 8):
     '''
       1. local pca denoise
       2. cell segmentation
@@ -136,7 +140,7 @@ def demix_cells(save_root):
     cluster.stop_all_jobs()
     return None
 
-    
+
 def compute_cell_dff(save_root, numCores=20, window=100, percentile=20):
     '''
       1. local pca denoise (\delta F signal)
@@ -146,10 +150,10 @@ def compute_cell_dff(save_root, numCores=20, window=100, percentile=20):
     '''
     import fish_proc.utils.dask_ as fdask
     from fish_proc.utils.getCameraInfo import getCameraInfo
-    import dask.array as da    
-    
+    import dask.array as da
+
     # set worker
-    cluster, client = fdask.setup_workers(numCores)    
+    cluster, client = fdask.setup_workers(numCores)
     files = sorted(glob(dir_root+'/*.h5'))
     chunks = File(files[0],'r')['default'].shape
     data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
