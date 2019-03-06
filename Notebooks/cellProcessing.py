@@ -8,6 +8,8 @@ warnings.filterwarnings('ignore')
 import dask.array as da
 import shutil
 from utils import *
+import fish_proc.utils.dask_ as fdask
+from fish_proc.utils.getCameraInfo import getCameraInfo
 cameraNoiseMat = '/groups/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
 
 
@@ -29,9 +31,6 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20):
       3. detrend using percentile baseline
       4. local pca denoise
     '''
-    import fish_proc.utils.dask_ as fdask
-    from fish_proc.utils.getCameraInfo import getCameraInfo
-    import dask.array as da
 
     # set worker
     cluster, client = fdask.setup_workers(numCores)
@@ -89,10 +88,8 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20):
 
 
 def mask_brain(save_root, percentile=40, dt=5, numCores=20, is_skip_snr=True, save_masked_data=True):
-    import fish_proc.utils.dask_ as fdask
     from fish_proc.utils.snr import correlation_pnr
     from fish_proc.utils.noise_estimator import get_noise_fft
-    import dask.array as da
     cluster, client = fdask.setup_workers(numCores)
     print(client)
     Y_d_ave_ = da.from_array(File(f'{save_root}/Y_2dnorm_ave.h5', 'r')['default'], chunks=(1, -1, -1, -1))
@@ -129,7 +126,6 @@ def demix_cells(save_root, nsplit = 8, numCores = 200):
       1. local pca denoise
       2. cell segmentation
     '''
-    import fish_proc.utils.dask_ as fdask
     cluster, client = fdask.setup_workers(numCores)
     print(client)
     Y_svd_ = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
@@ -194,12 +190,9 @@ def compute_cell_dff_pixels(dir_root, save_root, numCores=20, window=100, percen
       3. Cell weight matrix apply to denoise and baseline
       4. dff
     '''
-    import fish_proc.utils.dask_ as fdask
-    from fish_proc.utils.getCameraInfo import getCameraInfo
-    import dask.array as da
-
     # set worker
     cluster, client = fdask.setup_workers(numCores)
+    print(client)
     files = sorted(glob(dir_root+'/*.h5'))
     chunks = File(files[0],'r')['default'].shape
     data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
@@ -215,7 +208,8 @@ def compute_cell_dff_pixels(dir_root, save_root, numCores=20, window=100, percen
     trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunk_x//4, chunk_y//4, -1))
     baseline_t = trans_data_t.map_blocks(lambda v: baseline(v, window=window, percentile=percentile), dtype='float32')
     min_t = trans_data_t.map_blocks(lambda v: np.min(np.percentile(v, 0.3), 0), dtype='float32')
-    return (trans_data_t-baseline_t)/(baseline_t-min_t)
+    dff = (trans_data_t-baseline_t)/(baseline_t-min_t)
+    return dff.compute()
 
 
 def compute_cell_dff_raw(dir_root, save_root, numCores=20, window=100, percentile=20):
@@ -225,9 +219,6 @@ def compute_cell_dff_raw(dir_root, save_root, numCores=20, window=100, percentil
       3. Cell weight matrix apply to denoise and baseline
       4. dff
     '''
-    import fish_proc.utils.dask_ as fdask
-    from fish_proc.utils.getCameraInfo import getCameraInfo
-    import dask.array as da
 
     # set worker
     cluster, client = fdask.setup_workers(numCores)
@@ -255,10 +246,7 @@ def compute_cell_dff_NMF(dir_root, save_root, numCores=20, window=100, percentil
       3. Cell weight matrix apply to denoise and baseline
       4. dff
     '''
-    import fish_proc.utils.dask_ as fdask
-    from fish_proc.utils.getCameraInfo import getCameraInfo
-    import dask.array as da
-
+    
     # set worker
     cluster, client = fdask.setup_workers(numCores)
     files = sorted(glob(dir_root+'/*.h5'))
