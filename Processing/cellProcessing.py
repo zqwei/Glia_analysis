@@ -73,15 +73,17 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20, n
 
     # compute detrend data
     chunk_x, chunk_y = chunks[-2:]
-    trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunk_x//nsplit, chunk_y//nsplit, -1))
+    trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, 'auto', 'auto', -1))
     Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
 
     # remove meaning before svd (-- pca)
     Y_d_ave = Y_d.mean(axis=-1, keepdims=True, dtype='float32')
-    save_h5(f'{save_root}/Y_2dnorm_ave.h5', Y_d_ave.compute(), dtype='float32')
+    if not os.path.exists(f'{save_root}/Y_2dnorm_ave.h5'):
+        save_h5(f'{save_root}/Y_2dnorm_ave.h5', Y_d_ave.compute(), dtype='float32')
 
     # local pca on overlap blocks
     Y_d = Y_d - Y_d_ave
+    Y_d = Y_d.rechunk((1, chunk_x//nsplit, chunk_y//nsplit, -1))
     # xy_lap = 4 # overlap by 10 pixel in blocks
     # g = da.overlap.overlap(Y_d, depth={1: xy_lap, 2: xy_lap}, boundary={1: 0, 2: 0})
     # Y_svd = g.map_blocks(local_pca, dtype='float32')
@@ -98,7 +100,6 @@ def mask_brain(save_root, percentile=40, dt=5, numCores=20, is_skip_snr=True, sa
     from fish_proc.utils.noise_estimator import get_noise_fft
     cluster, client = fdask.setup_workers(numCores)
     print_client_links(cluster)
-
     Y_d_ave_ = da.from_array(File(f'{save_root}/Y_2dnorm_ave.h5', 'r')['default'], chunks=(1, -1, -1, -1))
     Y_svd_ = da.from_zarr(f'{save_root}/local_pca_data.zarr')
     Y_svd_ = Y_svd_.rechunk((1, -1, -1, -1))
@@ -127,6 +128,7 @@ def mask_brain(save_root, percentile=40, dt=5, numCores=20, is_skip_snr=True, sa
     cluster.stop_all_jobs()
     time.sleep(10)
     return None
+
 
 def demix_cells(save_root, nsplit = 8, numCores = 200):
     '''
