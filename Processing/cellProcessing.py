@@ -203,7 +203,6 @@ def compute_cell_dff_pixels(dir_root, save_root, numCores=20, window=100, percen
     # set worker
     cluster, client = fdask.setup_workers(numCores)
     print_client_links(cluster)
-
     files = sorted(glob(dir_root+'/*.h5'))
     chunks = File(files[0],'r')['default'].shape
     data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
@@ -216,63 +215,70 @@ def compute_cell_dff_pixels(dir_root, save_root, numCores=20, window=100, percen
     trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
     # baseline
     chunk_x, chunk_y = chunks[-2:]
-    trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunk_x//4, chunk_y//4, -1))
+    trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, 1, 1, -1))
     baseline_t = trans_data_t.map_blocks(lambda v: baseline(v, window=window, percentile=percentile), dtype='float32')
     min_t = trans_data_t.map_blocks(lambda v: np.min(np.percentile(v, 0.3), 0), dtype='float32')
     dff = (trans_data_t-baseline_t)/(baseline_t-min_t)
-    return dff.compute()
-
-
-def compute_cell_dff_raw(dir_root, save_root, numCores=20, window=100, percentile=20):
-    '''
-      1. local pca denoise (\delta F signal)
-      2. baseline
-      3. Cell weight matrix apply to denoise and baseline
-      4. dff
-    '''
-#     # set worker
-#     cluster, client = fdask.setup_workers(numCores)
-#     files = sorted(glob(dir_root+'/*.h5'))
-#     chunks = File(files[0],'r')['default'].shape
-#     data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
-#     # pixel denoise
-#     cameraInfo = getCameraInfo(dir_root)
-#     denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraInfo=cameraInfo))
-#     trans_affine_ = np.load(f'{save_root}/trans_affs.npy')
-#     trans_affine_ = da.from_array(trans_affine_, chunks=(1,4,4))
-#     # apply affine transform
-#     trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
-#     # baseline
-#     chunk_x, chunk_y = chunks[-2:]
-#     trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunk_x//4, chunk_y//4, -1))
-#     baseline_t = trans_data_t.map_blocks(lambda v: baseline(v, window=window, percentile=percentile), dtype='float32')
+    dff.to_zarr(f'{save_root}/pixel_dff.zarr', overwrite=True)
+    cluster.stop_all_jobs()
+    cluster.close()
     return None
 
 
-def compute_cell_dff_NMF(dir_root, save_root, numCores=20, window=100, percentile=20, min_p=0.3):
+def compute_cell_dff_raw(dir_root, save_root, numCores=20, window=100, percentile=20, nsplit=8):
     '''
       1. local pca denoise (\delta F signal)
       2. baseline
       3. Cell weight matrix apply to denoise and baseline
       4. dff
     '''
+    # set worker
+    cluster, client = fdask.setup_workers(numCores)
+    files = sorted(glob(dir_root+'/*.h5'))
+    chunks = File(files[0],'r')['default'].shape
+    data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
+    # pixel denoise
+    cameraInfo = getCameraInfo(dir_root)
+    denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraInfo=cameraInfo))
+    trans_affine_ = np.load(f'{save_root}/trans_affs.npy')
+    trans_affine_ = da.from_array(trans_affine_, chunks=(1,4,4))
+    # apply affine transform
+    trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
+    # baseline
+    chunk_x, chunk_y = chunks[-2:]
+    trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunk_x//nsplit, chunk_y//nsplit, -1))
+    if not os.path.exists(f'{save_root}/cell_raw_dff'):
+        os.makedirs(f'{save_root}/cell_raw_dff')
+    trans_data_t.map_blocks(compute_cell_raw_dff, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, window=window, percentile=percentile).compute()
+    return None
 
-#     # set worker
-#     cluster, client = fdask.setup_workers(numCores)
-#     files = sorted(glob(dir_root+'/*.h5'))
-#     chunks = File(files[0],'r')['default'].shape
-#     data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
-#     # pixel denoise
-#     cameraInfo = getCameraInfo(dir_root)
-#     denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraInfo=cameraInfo))
-#     trans_affine_ = np.load(f'{save_root}/trans_affs.npy')
-#     trans_affine_ = da.from_array(trans_affine_, chunks=(1,4,4))
-#     # apply affine transform
-#     trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
-#     # baseline
-#     trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, 1, 1, -1))
-#     baseline_t = trans_data_t.map_blocks(lambda v: baseline(v, window=window, percentile=percentile), dtype='float32')
-#     Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=100, percentile=20), dtype='float32')
+
+def compute_cell_dff_NMF(dir_root, save_root, numCores=20, window=100, percentile=20, nsplit=8, dt=5):
+    '''
+      1. local pca denoise (\delta F signal)
+      2. baseline
+      3. Cell weight matrix apply to denoise and baseline
+      4. dff
+    '''
+    # set worker
+    cluster, client = fdask.setup_workers(numCores)
+    files = sorted(glob(dir_root+'/*.h5'))
+    chunks = File(files[0],'r')['default'].shape
+    data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
+    # pixel denoise
+    cameraInfo = getCameraInfo(dir_root)
+    denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraInfo=cameraInfo))
+    trans_affine_ = np.load(f'{save_root}/trans_affs.npy')
+    trans_affine_ = da.from_array(trans_affine_, chunks=(1,4,4))
+    # apply affine transform
+    trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
+    # baseline
+    chunk_x, chunk_y = chunks[-2:]
+    trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunk_x//nsplit, chunk_y//nsplit, -1))
+    pca_data = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr').rechunk((1, chunk_x//nsplit, chunk_y//nsplit, -1))
+    if not os.path.exists(f'{save_root}/cell_nmf_dff'):
+        os.makedirs(f'{save_root}/cell_nmf_dff')
+    da.map_blocks(compute_cell_denoise_dff, trans_data_t, pca_data, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, dt=dt, window=window, percentile=percentile).compute()
     return None
 
 

@@ -244,3 +244,105 @@ def demix_blocks(block, Cblock, save_folder='.', block_id=None):
         pass
 
     return np.zeros([1]*4)
+
+
+def demix_file_name_block(save_root='.', block_id=None):
+    fname = f'{save_root}/demix_rlt/period_Y_demix_block_'
+    for _ in block_id:
+        fname += '_'+str(_)
+    return fname+'_rlt.pkl'
+
+
+def load_A_matrix(save_root='.', block_id=None, min_size=40):
+    fname = demix_file_name_block(save_root=save_root, block_id=block_id)
+    with open(fname+'_rlt.pkl', 'rb') as f:
+        try:
+            rlt_ = pickle.load(f)
+            A = rlt_['fin_rlt']['a']
+            return A[:, (A>0).sum(axis=0)>min_size]
+        except:
+            return None
+
+
+def compute_cell_raw_dff(block, save_root='.', window=100, percentile=20, block_id=None):
+    from fish_proc.utils.demix import recompute_C_matrix
+    fname = demix_file_name_block(save_root=save_root, block_id=block_id)
+    if not os.path.exists(fname):
+        return np.zeros([1]*4)
+    else:
+        A, b = load_A_matrix(save_root=save_root, block_id=block_id)
+        if A is None:
+            return np.zeros([1]*4)
+        if A.shape[1] == 0:
+            return np.zeros([1]*4)
+    
+    fsave = f'{save_root}/cell_raw_dff/period_Y_demix_block_'
+    for _ in block_id:
+        fsave += '_'+str(_)
+    fsave += '_rlt.h5'
+    
+    block_ = block.squeeze(axis=0) # remove z, remaining x, y, t
+    d1, d2, _ = block_.shape
+    F0 = baseline(block_, window=window, percentile=percentile)
+    dF = block_ - F0
+    min_t = np.percentile(block, 0.3, axis=-1)
+    min_t[min_t>0] = 0
+    F0 = F0 - min_t
+    cell_F0 = recompute_C_matrix(F0, A)
+    cell_dF = recompute_C_matrix(dF, A)
+    A = A.reshape((d1, d2, -1), order="F")
+    with File(fsave, 'w') as f:
+        f.create_dataset('A', data=A, compression='gzip', chunks=True, shuffle=True)
+        f.create_dataset('cell_dF', data=cell_dF, compression='gzip', chunks=True, shuffle=True)
+        f.create_dataset('cell_F0', data=cell_F0, compression='gzip', chunks=True, shuffle=True)
+        f.close()
+    return np.zeros([1]*4)
+
+
+def load_Ab_matrix(save_root='.', block_id=None, min_size=40):
+    fname = demix_file_name_block(save_root=save_root, block_id=block_id)
+    with open(fname+'_rlt.pkl', 'rb') as f:
+        try:
+            rlt_ = pickle.load(f)
+            A = rlt_['fin_rlt']['a']
+            return A[:, (A>0).sum(axis=0)>min_size], rlt_['fin_rlt']['b']
+        except:
+            return None, None
+
+
+def pos_sig_correction(mov, dt, axis_=-1):
+    return mov - (mov[:, :, dt]).min(axis=axis_, keepdims=True)
+
+
+def compute_cell_denoise_dff(block, pca_block, save_root='.', dt=5, window=100, percentile=20, block_id=None):
+    from fish_proc.utils.demix import recompute_C_matrix
+    fname = demix_file_name_block(save_root=save_root, block_id=block_id)
+    if not os.path.exists(fname):
+        return np.zeros([1]*4)
+    else:
+        A = load_Ab_matrix(save_root=save_root, block_id=block_id)
+        if A is None:
+            return np.zeros([1]*4)
+        if A.shape[1] == 0:
+            return np.zeros([1]*4)
+    
+    fsave = f'{save_root}/cell_nmf_dff/period_Y_demix_block_'
+    for _ in block_id:
+        fsave += '_'+str(_)
+    fsave += '_rlt.h5'
+    
+    block_ = block.squeeze(axis=0) # remove z, remaining x, y, t
+    d1, d2, _ = block_.shape
+    F0 = baseline(block_, window=window, percentile=percentile)
+    min_t = np.percentile(block, 0.3, axis=-1)
+    min_t[min_t>0] = 0
+    cell_F0 = recompute_C_matrix(F0 - min_t, A)
+    dF = pos_sig_correction(pca_block.squeeze(axis=0), dt) - b.reshape((d1, d2, 1), order="F")
+    cell_dF = recompute_C_matrix(dF, A)
+    A = A.reshape((d1, d2, -1), order="F")
+    with File(fsave, 'w') as f:
+        f.create_dataset('A', data=A, compression='gzip', chunks=True, shuffle=True)
+        f.create_dataset('cell_dF', data=cell_dF, compression='gzip', chunks=True, shuffle=True)
+        f.create_dataset('cell_F0', data=cell_F0, compression='gzip', chunks=True, shuffle=True)
+        f.close()
+    return np.zeros([1]*4)
