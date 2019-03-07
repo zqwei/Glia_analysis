@@ -29,7 +29,7 @@ def print_client_links(cluster):
     return None
 
 
-def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20):
+def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20, nsplit = 4):
     '''
       1. pixel denoise
       2. registration -- save registration file
@@ -73,7 +73,7 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20):
 
     # compute detrend data
     chunk_x, chunk_y = chunks[-2:]
-    trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunk_x//4, chunk_y//4, -1))
+    trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunk_x//nsplit, chunk_y//nsplit, -1))
     Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
 
     # remove meaning before svd (-- pca)
@@ -82,10 +82,11 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20):
 
     # local pca on overlap blocks
     Y_d = Y_d - Y_d_ave
-    xy_lap = 4 # overlap by 10 pixel in blocks
-    g = da.overlap.overlap(Y_d, depth={1: xy_lap, 2: xy_lap}, boundary={1: 0, 2: 0})
-    Y_svd = g.map_blocks(local_pca, dtype='float32')
-    Y_svd = da.overlap.trim_internal(Y_svd, {1: xy_lap, 2: xy_lap})
+    # xy_lap = 4 # overlap by 10 pixel in blocks
+    # g = da.overlap.overlap(Y_d, depth={1: xy_lap, 2: xy_lap}, boundary={1: 0, 2: 0})
+    # Y_svd = g.map_blocks(local_pca, dtype='float32')
+    # Y_svd = da.overlap.trim_internal(Y_svd, {1: xy_lap, 2: xy_lap})
+    Y_svd = Y_d.map_blocks(local_pca, dtype='float32')
     Y_svd.to_zarr(f'{save_root}/local_pca_data.zarr')
     cluster.stop_all_jobs()
     time.sleep(10)
@@ -97,7 +98,7 @@ def mask_brain(save_root, percentile=40, dt=5, numCores=20, is_skip_snr=True, sa
     from fish_proc.utils.noise_estimator import get_noise_fft
     cluster, client = fdask.setup_workers(numCores)
     print_client_links(cluster)
-    
+
     Y_d_ave_ = da.from_array(File(f'{save_root}/Y_2dnorm_ave.h5', 'r')['default'], chunks=(1, -1, -1, -1))
     Y_svd_ = da.from_zarr(f'{save_root}/local_pca_data.zarr')
     Y_svd_ = Y_svd_.rechunk((1, -1, -1, -1))
@@ -134,7 +135,7 @@ def demix_cells(save_root, nsplit = 8, numCores = 200):
     '''
     cluster, client = fdask.setup_workers(numCores)
     print_client_links(cluster)
-    
+
     Y_svd_ = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
     Cn_list = File(f'{save_root}/local_correlation_map.h5', 'r')['default'].value
     _, xdim, ydim = Cn_list.shape
@@ -200,7 +201,7 @@ def compute_cell_dff_pixels(dir_root, save_root, numCores=20, window=100, percen
     # set worker
     cluster, client = fdask.setup_workers(numCores)
     print_client_links(cluster)
-    
+
     files = sorted(glob(dir_root+'/*.h5'))
     chunks = File(files[0],'r')['default'].shape
     data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
