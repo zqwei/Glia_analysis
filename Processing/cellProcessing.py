@@ -23,6 +23,11 @@ def refresh_workers(cluster, numCores=20):
     cluster.start_workers(numCores)
     return None
 
+def print_client_links(cluster):
+    print(f'Scheduler: {cluster.scheduler_address}')
+    print(f'Dashboard link: {cluster.dashboard_link}')
+    return None
+
 
 def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20):
     '''
@@ -34,7 +39,7 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20):
 
     # set worker
     cluster, client = fdask.setup_workers(numCores)
-    print(client)
+    print_client_links(cluster)
 
     files = sorted(glob(dir_root+'/*.h5'))
     chunks = File(files[0],'r')['default'].shape
@@ -91,7 +96,8 @@ def mask_brain(save_root, percentile=40, dt=5, numCores=20, is_skip_snr=True, sa
     from fish_proc.utils.snr import correlation_pnr
     from fish_proc.utils.noise_estimator import get_noise_fft
     cluster, client = fdask.setup_workers(numCores)
-    print(client)
+    print_client_links(cluster)
+    
     Y_d_ave_ = da.from_array(File(f'{save_root}/Y_2dnorm_ave.h5', 'r')['default'], chunks=(1, -1, -1, -1))
     Y_svd_ = da.from_zarr(f'{save_root}/local_pca_data.zarr')
     Y_svd_ = Y_svd_.rechunk((1, -1, -1, -1))
@@ -127,7 +133,8 @@ def demix_cells(save_root, nsplit = 8, numCores = 200):
       2. cell segmentation
     '''
     cluster, client = fdask.setup_workers(numCores)
-    print(client)
+    print_client_links(cluster)
+    
     Y_svd_ = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
     Cn_list = File(f'{save_root}/local_correlation_map.h5', 'r')['default'].value
     _, xdim, ydim = Cn_list.shape
@@ -192,7 +199,8 @@ def compute_cell_dff_pixels(dir_root, save_root, numCores=20, window=100, percen
     '''
     # set worker
     cluster, client = fdask.setup_workers(numCores)
-    print(client)
+    print_client_links(cluster)
+    
     files = sorted(glob(dir_root+'/*.h5'))
     chunks = File(files[0],'r')['default'].shape
     data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
