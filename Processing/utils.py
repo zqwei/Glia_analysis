@@ -155,7 +155,7 @@ def local_pca_test(block, block_id=None):
     return np.ones([1]*len(block_id))*mp.cpu_count()
 
 
-def local_pca(block, block_id=None):
+def local_pca_block(block, block_id=None):
     from fish_proc.denoiseLocalPCA.denoise import temporal as svd_patch
     from numpy import expand_dims
     dx=4
@@ -165,6 +165,14 @@ def local_pca(block, block_id=None):
     else:
         Y_svd, _ = svd_patch(block.squeeze(), nblocks=nblocks, dx=dx, stim_knots=None, stim_delta=0, is_single_core=True)
     return expand_dims(Y_svd, 0)
+
+def local_pca(block):
+    from fish_proc.denoiseLocalPCA.denoise import temporal as svd_patch
+    from numpy import expand_dims
+    dx=4
+    nblocks=[64, 64]
+    Y_svd, _ = svd_patch(block.squeeze(), nblocks=nblocks, dx=dx, stim_knots=None, stim_delta=0, is_single_core=False)
+    return Y_svd
 
 
 # mask functions

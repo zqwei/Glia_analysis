@@ -83,15 +83,35 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20, n
 
     # local pca on overlap blocks
     Y_d = Y_d - Y_d_ave
-    Y_d = Y_d.rechunk((1, chunk_x//nsplit, chunk_y//nsplit, -1))
-    # xy_lap = 4 # overlap by 10 pixel in blocks
-    # g = da.overlap.overlap(Y_d, depth={1: xy_lap, 2: xy_lap}, boundary={1: 0, 2: 0})
-    # Y_svd = g.map_blocks(local_pca, dtype='float32')
-    # Y_svd = da.overlap.trim_internal(Y_svd, {1: xy_lap, 2: xy_lap})
-    Y_svd = Y_d.map_blocks(local_pca, dtype='float32')
-    Y_svd.to_zarr(f'{save_root}/local_pca_data.zarr')
+    Y_d.to_zarr(f'{save_root}/Y_d.zarr')
+    
+    # # xy_lap = 4 # overlap by 10 pixel in blocks
+    # # g = da.overlap.overlap(Y_d, depth={1: xy_lap, 2: xy_lap}, boundary={1: 0, 2: 0})
+    # # Y_svd = g.map_blocks(local_pca, dtype='float32')
+    # # Y_svd = da.overlap.trim_internal(Y_svd, {1: xy_lap, 2: xy_lap})
+    # Y_svd = Y_d.map_blocks(local_pca_block, dtype='float32')
+    # Y_svd = Y_d.map_blocks(local_pca, dtype='float32')
+    # Y_svd.to_zarr(f'{save_root}/local_pca_data.zarr')
+    
     cluster.stop_all_jobs()
     time.sleep(10)
+    return None
+
+
+def local_pca(save_root):
+    '''
+      1. pixel denoise
+      2. registration -- save registration file
+      3. detrend using percentile baseline
+      4. local pca denoise
+    '''
+    Y_d = da.from_zarr(f'{save_root}/Y_d.zarr').rechunk((1, -1, -1, -1))
+    if not os.path.exists(f'{save_root}/local_pca_data/'):
+        os.mkdir(f'{save_root}/local_pca_data/')
+    
+    for n, n_yd in Y_d:
+        if not os.path.exists('%s/local_pca_data/Layer_%05d.h5'%(save_root, n)):
+            save_h5('%s/local_pca_data/Layer_%05d.h5'%(save_root, n), local_pca(n_yd.compute()), dtype='float32')
     return None
 
 
@@ -101,8 +121,12 @@ def mask_brain(save_root, percentile=40, dt=5, numCores=20, is_skip_snr=True, sa
     cluster, client = fdask.setup_workers(numCores)
     print_client_links(cluster)
     Y_d_ave_ = da.from_array(File(f'{save_root}/Y_2dnorm_ave.h5', 'r')['default'], chunks=(1, -1, -1, -1))
-    Y_svd_ = da.from_zarr(f'{save_root}/local_pca_data.zarr')
-    Y_svd_ = Y_svd_.rechunk((1, -1, -1, -1))
+    
+    files = sorted(glob(f'{save_root}/local_pca_data/*.h5'))
+    chunks = File(files[0],'r')['default'].shape
+    Y_svd_ = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
+    # Y_svd_ = da.from_zarr(f'{save_root}/local_pca_data.zarr')
+    # Y_svd_ = Y_svd_.rechunk((1, -1, -1, -1))
     mask_ave_ =  Y_d_ave_.map_blocks(lambda v: intesity_mask(v, percentile=percentile), dtype='bool').compute()
     mask_snr = mask_ave_.copy().squeeze(axis=-1) #drop last dim
     Cn_list = np.zeros(mask_ave_.shape).squeeze(axis=-1) #drop last dim
