@@ -10,11 +10,11 @@ import shutil
 from utils import *
 import fish_proc.utils.dask_ as fdask
 from fish_proc.utils.getCameraInfo import getCameraInfo
+import time
 cameraNoiseMat = '/groups/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
 
 
 def refresh_workers(cluster, numCores=20):
-    import time
     try:
         cluster.stop_all_jobs()
         time.sleep(10)
@@ -50,13 +50,16 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20, n
     denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraInfo=cameraInfo))
 
     # save and compute reference image
+    print('Compute reference image ---')
     if not os.path.exists(f'{save_root}/motion_fix_.h5'):
         med_win = len(denoised_data)
-        ref_img = denoised_data[med_win-10:med_win+10].mean(axis=0).compute()
+        ref_img = denoised_data[med_win-50:med_win+50].mean(axis=0).compute()
         save_h5(f'{save_root}/motion_fix_.h5', ref_img, dtype='float16')
         refresh_workers(cluster, numCores=numCores)
-
+    print('--- Done computing reference image')
+    
     # compute affine transform
+    print('Registration to reference image ---')
     if not os.path.exists(f'{save_root}/trans_affs.npy'):
         ref_img = File(f'{save_root}/motion_fix_.h5', 'r')['default'].value
         ref_img = ref_img.max(axis=0, keepdims=True)
@@ -67,51 +70,66 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20, n
     else:
         trans_affine_ = np.load(f'{save_root}/trans_affs.npy')
         trans_affine_ = da.from_array(trans_affine_, chunks=(1,4,4))
+    print('--- Done registration reference image')
 
     # apply affine transform
-    trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
-
-    # compute detrend data
-    chunk_x, chunk_y = chunks[-2:]
-    trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, 'auto', 'auto', -1))
-    Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
-
-    # remove meaning before svd (-- pca)
-    Y_d_ave = Y_d.mean(axis=-1, keepdims=True, dtype='float32')
-    if not os.path.exists(f'{save_root}/Y_2dnorm_ave.h5'):
-        save_h5(f'{save_root}/Y_2dnorm_ave.h5', Y_d_ave.compute(), dtype='float32')
-
-    # local pca on overlap blocks
-    Y_d = Y_d - Y_d_ave
-    Y_d.to_zarr(f'{save_root}/Y_d.zarr')
-    
-    # # xy_lap = 4 # overlap by 10 pixel in blocks
-    # # g = da.overlap.overlap(Y_d, depth={1: xy_lap, 2: xy_lap}, boundary={1: 0, 2: 0})
-    # # Y_svd = g.map_blocks(local_pca, dtype='float32')
-    # # Y_svd = da.overlap.trim_internal(Y_svd, {1: xy_lap, 2: xy_lap})
-    # Y_svd = Y_d.map_blocks(local_pca_block, dtype='float32')
-    # Y_svd = Y_d.map_blocks(local_pca, dtype='float32')
-    # Y_svd.to_zarr(f'{save_root}/local_pca_data.zarr')
-    
+    print('Apply registration ---')
+    if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
+        trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
+        trans_data_.rechunk((1, 1, chunks[2]//nsplit, chunks[2]//nsplit)).to_zarr(f'{save_root}/motion_corrected_data.zarr')
+        refresh_workers(cluster, numCores=numCores)
     cluster.stop_all_jobs()
     time.sleep(10)
     return None
 
 
-def local_pca(save_root):
+def local_pca(save_root, numCores=20):
     '''
       1. pixel denoise
       2. registration -- save registration file
       3. detrend using percentile baseline
       4. local pca denoise
     '''
-    Y_d = da.from_zarr(f'{save_root}/Y_d.zarr').rechunk((1, -1, -1, -1))
-    if not os.path.exists(f'{save_root}/local_pca_data/'):
-        os.mkdir(f'{save_root}/local_pca_data/')
+    cluster, client = fdask.setup_workers(numCores)
+    print_client_links(cluster)
+    if not os.path.exists(f'{save_root}/motion_corrected_data_by_t.zarr'):
+        trans_data_ = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+        _, _, nx, ny = trans_data_.chunksize
+        trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, nx, ny, -1))
+        trans_data_t.to_zarr(f'{save_root}/motion_corrected_data_by_t.zarr') # this data will be used later... make a copy here
+        cluster.stop_all_jobs()
+        time.sleep(10)
+        
+#     if os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
+#         trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data_by_t.zarr')
+# #         shutil.rmtree(f'{save_root}/motion_corrected_data.zarr')
     
-    for n, n_yd in Y_d:
-        if not os.path.exists('%s/local_pca_data/Layer_%05d.h5'%(save_root, n)):
-            save_h5('%s/local_pca_data/Layer_%05d.h5'%(save_root, n), local_pca(n_yd.compute()), dtype='float32')
+#     # compute detrend data
+#     print('Compute detrended data ---')
+# #     _, _, chunk_x, chunk_y = trans_data_.shape
+# #     trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunk_x//nsplit, chunk_y//nsplit, -1))
+#     Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
+
+    
+# #     # remove meaning before svd (-- pca)
+#     Y_d_ave = Y_d.mean(axis=-1, keepdims=True, dtype='float32')
+#     if not os.path.exists(f'{save_root}/Y_2dnorm_ave.h5'):
+#         print('Save average data ---')
+#         save_h5(f'{save_root}/Y_2dnorm_ave.h5', Y_d_ave.compute(), dtype='float32')
+
+#     # local pca on overlap blocks
+#     Y_d = Y_d - Y_d_ave
+# #     print('Save detrend data ---')
+# #     Y_d.to_zarr(f'{save_root}/Y_d.zarr')
+    
+# #     print('--- Done computing detrended data')
+# #     Y_d = da.from_zarr(f'{save_root}/Y_d.zarr').rechunk((1, -1, -1, -1))
+# #     if not os.path.exists(f'{save_root}/local_pca_data/'):
+# #         os.mkdir(f'{save_root}/local_pca_data/')
+    
+#     for n, n_yd in Y_d:
+#         if not os.path.exists('%s/local_pca_data/Layer_%05d.h5'%(save_root, n)):
+#             save_h5('%s/local_pca_data/Layer_%05d.h5'%(save_root, n), local_pca(n_yd.compute()), dtype='float32')
     return None
 
 
@@ -306,8 +324,3 @@ def compute_cell_dff_NMF(dir_root, save_root, numCores=20, window=100, percentil
     return None
 
 
-if __name__ == '__main__':
-    # dir_root = '/nrs/ahrens/Yu/SPIM/active_dataset/glia_neuron_imaging/20161109/fish2/20161109_2_1_6dpf_GFAP_GC_Huc_RG_GA_CL_fb_OL_f0_0GAIN_20161109_211950/raw'
-    # save_root = '.'
-    # preprocessing(dir_root, save_root, numCores=100, window=1000, percentile=20)
-    print('------')
