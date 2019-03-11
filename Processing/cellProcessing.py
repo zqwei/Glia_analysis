@@ -55,9 +55,9 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20, n
         med_win = len(denoised_data)
         ref_img = denoised_data[med_win-50:med_win+50].mean(axis=0).compute()
         save_h5(f'{save_root}/motion_fix_.h5', ref_img, dtype='float16')
-        refresh_workers(cluster, numCores=numCores)
+        
     print('--- Done computing reference image')
-    
+
     # compute affine transform
     print('Registration to reference image ---')
     if not os.path.exists(f'{save_root}/trans_affs.npy'):
@@ -74,15 +74,33 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20, n
 
     # apply affine transform
     print('Apply registration ---')
-    if not os.path.exists(f'{save_root}/motion_corrected_data_by_t.zarr'):
-        if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
-            trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
-            trans_data_.rechunk((1, 1, chunks[2]//nsplit, chunks[2]//nsplit)).to_zarr(f'{save_root}/motion_corrected_data.zarr')
-            refresh_workers(cluster, numCores=numCores)
-        cluster.stop_all_jobs()
-        time.sleep(10)
-        img_t_rechunk(save_root, nsplit = nsplit)
-        test_img_t_rechunk(save_root)
+    if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
+        trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
+        trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunks[1]//nsplit, chunks[2]//nsplit, -1))
+        trans_data_t.to_zarr(f'{save_root}/motion_corrected_data.zarr')
+        refresh_workers(cluster, numCores=numCores)
+
+    # detrend
+    trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+    print(trans_data_t) # make sure the chunks size is correct as nsplit
+    Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
+
+    # remove meaning before svd (-- pca)
+    if not os.path.exists(f'{save_root}/Y_2dnorm_ave.h5'):
+        Y_d_ave = Y_d.mean(axis=-1, keepdims=True, dtype='float32')
+        print('Save average data ---')
+        Y_d_ave.to_zarr(f'{save_root}/Y_ave.zarr')
+        refresh_workers(cluster, numCores=numCores)
+        
+    Y_d_ave = da.from_zarr(f'{save_root}/Y_ave.zarr')
+    print(Y_d_ave)
+    
+    Y_d = Y_d - Y_d_ave
+    Y_svd = Y_d.map_blocks(local_pca_block, dtype='float32')
+    Y_svd.to_zarr(f'{save_root}/local_pca_data.zarr')
+    cluster.stop_all_jobs()
+    time.sleep(10)
+
     return None
 
 
@@ -93,35 +111,35 @@ def local_pca(save_root, numCores=20):
       3. detrend using percentile baseline
       4. local pca denoise
     '''
-    cluster, client = fdask.setup_workers(numCores)
-    print_client_links(cluster)
-    
-    trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data_by_t.zarr')
-    chunks = trans_data_t.chunksize
-    Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
-    
-    
-    # remove meaning before svd (-- pca)
-    if not os.path.exists(f'{save_root}/Y_2dnorm_ave.h5'):
-        Y_d_ave = Y_d.mean(axis=-1, keepdims=True, dtype='float32')
-        print('Save average data ---')
-        save_h5(f'{save_root}/Y_2dnorm_ave.h5', Y_d_ave.compute(), dtype='float32')
-    else:
-        Y_d_ave = da.from_array(File(f'{save_root}/Y_2dnorm_ave.h5','r')['default'], chunks=chunks)
+#     cluster, client = fdask.setup_workers(numCores)
+#     print_client_links(cluster)
+
+#     trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data_by_t.zarr')
+#     chunks = trans_data_t.chunksize
+#     Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
+
+
+#     # remove meaning before svd (-- pca)
+#     if not os.path.exists(f'{save_root}/Y_2dnorm_ave.h5'):
+#         Y_d_ave = Y_d.mean(axis=-1, keepdims=True, dtype='float32')
+#         print('Save average data ---')
+#         save_h5(f'{save_root}/Y_2dnorm_ave.h5', Y_d_ave.compute(), dtype='float32')
+#     else:
+#         Y_d_ave = da.from_array(File(f'{save_root}/Y_2dnorm_ave.h5','r')['default'], chunks=(1, chunks[1]//nsplit, chunks[2]//nsplit, -1))
 
 #     # local pca on overlap blocks
 #     Y_d = Y_d - Y_d_ave
 # #     print('Save detrend data ---')
 # #     Y_d.to_zarr(f'{save_root}/Y_d.zarr')
-    
-# #     print('--- Done computing detrended data')
-# #     Y_d = da.from_zarr(f'{save_root}/Y_d.zarr').rechunk((1, -1, -1, -1))
-# #     if not os.path.exists(f'{save_root}/local_pca_data/'):
-# #         os.mkdir(f'{save_root}/local_pca_data/')
-    
-#     for n, n_yd in Y_d:
-#         if not os.path.exists('%s/local_pca_data/Layer_%05d.h5'%(save_root, n)):
-#             save_h5('%s/local_pca_data/Layer_%05d.h5'%(save_root, n), local_pca(n_yd.compute()), dtype='float32')
+
+    print('--- Done computing detrended data')
+    Y_d = da.from_zarr(f'{save_root}/Y_d.zarr').rechunk((1, -1, -1, -1))
+    if not os.path.exists(f'{save_root}/local_pca_data/'):
+        os.mkdir(f'{save_root}/local_pca_data/')
+
+    for n, n_yd in Y_d:
+        if not os.path.exists('%s/local_pca_data/Layer_%05d.h5'%(save_root, n)):
+            save_h5('%s/local_pca_data/Layer_%05d.h5'%(save_root, n), local_pca(n_yd.compute()), dtype='float32')
     return None
 
 
@@ -131,7 +149,7 @@ def mask_brain(save_root, percentile=40, dt=5, numCores=20, is_skip_snr=True, sa
     cluster, client = fdask.setup_workers(numCores)
     print_client_links(cluster)
     Y_d_ave_ = da.from_array(File(f'{save_root}/Y_2dnorm_ave.h5', 'r')['default'], chunks=(1, -1, -1, -1))
-    
+
     files = sorted(glob(f'{save_root}/local_pca_data/*.h5'))
     chunks = File(files[0],'r')['default'].shape
     Y_svd_ = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
@@ -322,8 +340,8 @@ def img_t_rechunk(save_root, nsplit = 4):
     compressor=Zstd(level=1)
     trans_data_ = zarr.open(f'{save_root}/motion_corrected_data.zarr', mode='r')
     t, z, x, y= trans_data_.shape
-    trans_data_t = zarr.open(f'{save_root}/motion_corrected_data_by_t.zarr', mode='w', 
-                             shape=(z, x, y, t), chunks=(1, x//nsplit, y//nsplit, t), 
+    trans_data_t = zarr.open(f'{save_root}/motion_corrected_data_by_t.zarr', mode='w',
+                             shape=(z, x, y, t), chunks=(1, x//nsplit, y//nsplit, t),
                              dtype=np.float32, compressor=compressor)
     for nz in range(z):
         print(f'Start process {nz} layer of the imaging stack ----')
@@ -343,7 +361,5 @@ def test_img_t_rechunk(save_root):
     nt = np.random.randint(t)
     if np.array_equal(trans_data_[nt, nz], trans_data_t[nz, :, :, nt]):
         print('Random selected array are identical, continue remove old data--')
-        shutil.rmtree(f'{save_root}/motion_corrected_data.zarr')    
+        shutil.rmtree(f'{save_root}/motion_corrected_data.zarr')
     return None
-
-
