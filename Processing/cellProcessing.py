@@ -100,85 +100,44 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20, n
     Y_svd.to_zarr(f'{save_root}/local_pca_data.zarr')
     cluster.stop_all_jobs()
     time.sleep(10)
-
     return None
 
 
-def local_pca(save_root, numCores=20):
-    '''
-      1. pixel denoise
-      2. registration -- save registration file
-      3. detrend using percentile baseline
-      4. local pca denoise
-    '''
-#     cluster, client = fdask.setup_workers(numCores)
-#     print_client_links(cluster)
-
-#     trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data_by_t.zarr')
-#     chunks = trans_data_t.chunksize
-#     Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
-
-
-#     # remove meaning before svd (-- pca)
-#     if not os.path.exists(f'{save_root}/Y_2dnorm_ave.h5'):
-#         Y_d_ave = Y_d.mean(axis=-1, keepdims=True, dtype='float32')
-#         print('Save average data ---')
-#         save_h5(f'{save_root}/Y_2dnorm_ave.h5', Y_d_ave.compute(), dtype='float32')
-#     else:
-#         Y_d_ave = da.from_array(File(f'{save_root}/Y_2dnorm_ave.h5','r')['default'], chunks=(1, chunks[1]//nsplit, chunks[2]//nsplit, -1))
-
-#     # local pca on overlap blocks
-#     Y_d = Y_d - Y_d_ave
-# #     print('Save detrend data ---')
-# #     Y_d.to_zarr(f'{save_root}/Y_d.zarr')
-
-    print('--- Done computing detrended data')
-    Y_d = da.from_zarr(f'{save_root}/Y_d.zarr').rechunk((1, -1, -1, -1))
-    if not os.path.exists(f'{save_root}/local_pca_data/'):
-        os.mkdir(f'{save_root}/local_pca_data/')
-
-    for n, n_yd in Y_d:
-        if not os.path.exists('%s/local_pca_data/Layer_%05d.h5'%(save_root, n)):
-            save_h5('%s/local_pca_data/Layer_%05d.h5'%(save_root, n), local_pca(n_yd.compute()), dtype='float32')
-    return None
-
-
-def mask_brain(save_root, percentile=40, dt=5, numCores=20, is_skip_snr=True, save_masked_data=True):
+def mask_brain(save_root, percentile=40, dt=5, numCores=20, redo_mask=False):
     from fish_proc.utils.snr import correlation_pnr
-    from fish_proc.utils.noise_estimator import get_noise_fft
+    
+    if not os.path.exists(f'{save_root}/mask_map.h5') or redo_mask:
+        Y_d_ave_ = da.from_zarr(f'{save_root}/Y_ave.zarr')
+        chunksize = Y_d_ave_.chunksize
+        Y_d_ave_ = Y_d_ave_.rechunk((1, -1, -1, -1))
+        mask =  Y_d_ave_.map_blocks(lambda v: intesity_mask(v, percentile=percentile), dtype='bool')
+        save_h5(f'{save_root}/mask_map.h5', mask.compute(), dtype='bool')
+        mask = mask.rechunk(chunksize)
+        print('Compute and save mask done --')
+    
     cluster, client = fdask.setup_workers(numCores)
     print_client_links(cluster)
-    Y_d_ave_ = da.from_array(File(f'{save_root}/Y_2dnorm_ave.h5', 'r')['default'], chunks=(1, -1, -1, -1))
-
-    files = sorted(glob(f'{save_root}/local_pca_data/*.h5'))
-    chunks = File(files[0],'r')['default'].shape
-    Y_svd_ = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
-    # Y_svd_ = da.from_zarr(f'{save_root}/local_pca_data.zarr')
-    # Y_svd_ = Y_svd_.rechunk((1, -1, -1, -1))
-    mask_ave_ =  Y_d_ave_.map_blocks(lambda v: intesity_mask(v, percentile=percentile), dtype='bool').compute()
-    mask_snr = mask_ave_.copy().squeeze(axis=-1) #drop last dim
-    Cn_list = np.zeros(mask_ave_.shape).squeeze(axis=-1) #drop last dim
-    for ii in range(Y_svd_.shape[0]):
-        _ = Y_svd_[ii].compute().copy()
-        _[~mask_ave_[ii].squeeze()] = 0
-        if not is_skip_snr:
-            mask_snr_ = snr_mask(_)
-            _[mask_snr_] = 0
-            mask_snr[ii] = np.logical_not(mask_snr_)
-        Cn, _ = correlation_pnr(_, skip_pnr=True)
-        Cn_list[ii] = Cn
-    mask = mask_ave_ & np.expand_dims(mask_snr, -1)
-    save_h5(f'{save_root}/mask_map.h5', mask, dtype='bool')
-    save_h5(f'{save_root}/local_correlation_map.h5', Cn_list, dtype='float32')
-    Y_svd_ = Y_svd_.rechunk((-1, -1, -1, 1))
-    _ = Y_svd_.map_blocks(lambda v: mask_blocks(v, mask=mask), dtype='float32')
-    refresh_workers(cluster, numCores=numCores)
-    if save_masked_data:
+    
+    if not os.path.exists(f'{save_root}/masked_local_pca_data.zarr') or redo_mask:
+        Y_svd_ = da.from_zarr(f'{save_root}/local_pca_data.zarr')
+        # _ = Y_svd_.map_blocks(lambda v: mask_blocks(v, mask=mask), dtype='float32')
+        _ = Y_svd_.map_blocks(mask, dtype='float32')   
         _.to_zarr(f'{save_root}/masked_local_pca_data.zarr', overwrite=True)
         refresh_workers(cluster, numCores=numCores)
+        print('Compute and save masked data done --')
+    
+    
     _[:, :, :, ::dt].to_zarr(f'{save_root}/masked_downsampled_local_pca_data.zarr')
+    print('Compute and save downsampled data (in time) done --')
     cluster.stop_all_jobs()
     time.sleep(10)
+    
+    Y_svd_t = da.from_zarr(f'{save_root}/masked_downsampled_local_pca_data.zarr')
+    Cn_list = np.zeros(mask.shape).squeeze(axis=-1) #drop last dim
+    for ii in range(Y_svd_t.shape[0]):
+        Cn, _ = correlation_pnr(Y_svd_t[ii], skip_pnr=True)
+        Cn_list[ii] = Cn   
+    save_h5(f'{save_root}/local_correlation_map.h5', Cn_list, dtype='float32')
     return None
 
 

@@ -195,8 +195,11 @@ def snr_mask(Y_svd, std_per=20, snr_per=10):
 
 
 def mask_blocks(block, mask=None):
+    if block.ndim != 4 or mask.ndim !=4:
+        print('error in block shape or mask shape')
+        return None
     _ = block.copy()
-    _[~mask] = 0
+    _[~mask.squeeze(axis=-1)] = 0
     return _
 
 
