@@ -64,7 +64,6 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20, n
         ref_img = File(f'{save_root}/motion_fix_.h5', 'r')['default'].value
         ref_img = ref_img.max(axis=0, keepdims=True)
         trans_affine = denoised_data.map_blocks(lambda x: estimate_rigid2d(x, fixed=ref_img), dtype='float32', drop_axis=(3), chunks=(1,4,4)).compute()
-        refresh_workers(cluster, numCores=numCores)
         np.save(f'{save_root}/trans_affs.npy', trans_affine)
         trans_affine_ = da.from_array(trans_affine, chunks=(1,4,4))
     else:
@@ -75,37 +74,51 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20, n
     # apply affine transform
     print('Apply registration ---')
     if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
+        if numCores<700:
+            numCores_ = 700
+        else:
+            numCores_ = numCores
+        refresh_workers(cluster, numCores=numCores_)
         trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
         trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunks[1]//nsplit, chunks[2]//nsplit, -1))
         trans_data_t.to_zarr(f'{save_root}/motion_corrected_data.zarr')
-        refresh_workers(cluster, numCores=numCores)
 
     # detrend
-    trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
-    print(trans_data_t) # make sure the chunks size is correct as nsplit
-    Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
+    if not os.path.exists(f'{save_root}/detrend_data.zarr'):
+        refresh_workers(cluster, numCores=trans_data_t.shape[0]*nsplit*nsplit+1)
+        trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+        Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
+        Y_d.to_zarr(f'{save_root}/detrend_data.zarr')
 
     # remove meaning before svd (-- pca)
-    if not os.path.exists(f'{save_root}/Y_2dnorm_ave.h5'):
+    if not os.path.exists(f'{save_root}/Y_ave.zarr'):
+        refresh_workers(cluster, numCores=10)
+        Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
         Y_d_ave = Y_d.mean(axis=-1, keepdims=True, dtype='float32')
         print('Save average data ---')
-        Y_d_ave.to_zarr(f'{save_root}/Y_ave.zarr')
-        refresh_workers(cluster, numCores=numCores)
-        
-    Y_d_ave = da.from_zarr(f'{save_root}/Y_ave.zarr')
-    print(Y_d_ave)
-    
-    Y_d = Y_d - Y_d_ave
-    Y_svd = Y_d.map_blocks(local_pca_block, dtype='float32')
-    Y_svd.to_zarr(f'{save_root}/local_pca_data.zarr')
+        Y_d_ave.to_zarr(f'{save_root}/Y_ave.zarr')  
     cluster.stop_all_jobs()
+    time.sleep(10)
+    return None
+
+
+def local_pca_on_mask(save_root, numCores=20):
+    if not os.path.exists(f'{save_root}/denoise_rlt'):
+        os.makedirs(f'{save_root}/denoise_rlt')
+    cluster, client = fdask.setup_workers(numCores)
+    print_client_links(cluster)
+    Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+    mask = da.from_zarr(f'{save_root}/mask_map.zarr')
+    Y_svd = da.map_blocks(local_pca_block, Y_d, mask, dtype='float32', save_folder=save_root)
+    Y_svd.to_zarr(f'{save_root}/masked_local_pca_data.zarr')
+    cluster.stop_all_jobs()
+    cluster.close()
     time.sleep(10)
     return None
 
 
 def mask_brain(save_root, percentile=40, dt=5, numCores=20, redo_mask=False):
     from fish_proc.utils.snr import correlation_pnr
-    
     if not os.path.exists(f'{save_root}/mask_map.h5') or redo_mask:
         Y_d_ave_ = da.from_zarr(f'{save_root}/Y_ave.zarr')
         chunksize = Y_d_ave_.chunksize

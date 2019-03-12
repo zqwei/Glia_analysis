@@ -155,16 +155,47 @@ def local_pca_test(block, block_id=None):
     return np.ones([1]*len(block_id))*mp.cpu_count()
 
 
-def local_pca_block(block, block_id=None):
+def local_pca_block(block, mask, save_folder='.', block_id=None):
     from fish_proc.denoiseLocalPCA.denoise import temporal as svd_patch
     from numpy import expand_dims
+    import sys
+    
+    orig_stdout = sys.stdout    
+    fname = f'{save_folder}/denoise_rlt/block_'
+    for _ in block_id:
+        fname += '_'+str(_)    
+    f = open(fname+'_info.txt', 'w')
+    sys.stdout = f
+    
+    print('block shape')
+    print(block.shape, flush=True)
+    
     dx=4
     nblocks=[20, 20]
     if np.prod(block.shape) == 1:
         Y_svd = block[0]
+        print('Testing data in dask', flush=True)
     else:
-        Y_svd, _ = svd_patch(block.squeeze(), nblocks=nblocks, dx=dx, stim_knots=None, stim_delta=0, is_single_core=True)
+        if mask is None:
+            print('No mask is applied', flush=True)
+        else:
+            if mask.sum() == 0:
+                print('No valid pixels')
+                sys.stdout = orig_stdout
+                f.close()
+                return np.zeros(block.shape)
+            print('mask shape')
+            print(mask.shape, flush=True)
+        W = block.squeeze().copy()
+        W = W - W.mean(axis=-1, keepdims=True)
+        Y_svd, _ = svd_patch(W, nblocks=nblocks, dx=dx, stim_knots=None, stim_delta=0, mask=~mask.squeeze(), is_single_core=True)
+        if mask is not None:
+            print('Set masked area to zero')
+            Y_svd[~mask.squeeze()] = 0
+    sys.stdout = orig_stdout
+    f.close()
     return expand_dims(Y_svd, 0)
+
 
 def local_pca(block):
     from fish_proc.denoiseLocalPCA.denoise import temporal as svd_patch
