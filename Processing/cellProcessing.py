@@ -119,9 +119,6 @@ def local_pca_on_mask(save_root, numCores=20):
     mask = da.from_zarr(f'{save_root}/mask_map.zarr')
     Y_svd = da.map_blocks(fb_pca_block, Y_d, mask, dtype='float32', save_folder=save_root)
     Y_svd.to_zarr(f'{save_root}/masked_local_pca_data.zarr')
-    cluster.stop_all_jobs()
-    cluster.close()
-    time.sleep(10)
     return None
 
 
