@@ -195,6 +195,40 @@ def local_pca_block(block, mask, save_folder='.', block_id=None):
         return expand_dims(Y_svd, 0)
     else:
         return Y_svd
+    
+    
+def fb_pca_block(block, mask_block, save_folder='.', block_id=None):
+    # using fb pca instead of local pca from fish
+    from fbpca import pca
+    from numpy import expand_dims
+    from fish_proc.utils.memory import get_process_memory, clear_variables
+    import sys
+    orig_stdout = sys.stdout
+    fname = f'{save_folder}/denoise_rlt/block_'
+    for _ in block_id:
+        fname += '_'+str(_)    
+    f = open(fname+'_info.txt', 'w')
+    sys.stdout = f
+    
+    if mask_block.sum()==0:
+        print('No valid pixels')
+        sys.stdout = orig_stdout
+        f.close()
+        return np.zeros(block.shape)
+    
+    get_process_memory()
+    M = (block-block.mean(axis=-1, keepdims=True)).squeeze()
+    dimsM = M.shape
+    M = M.reshape((np.prod(dimsM[:-1]),dimsM[-1]),order='F')
+    k = min(min(M.shape)//4, 300)
+    [U, S, Va] = pca(M.T, k=k, n_iter=20, raw=True)
+    clear_variables(M)
+    get_process_memory()
+    M_pca = U.dot(np.diag(S).dot(Va))
+    M_pca = M_pca.T.reshape(dimsM, order='F')
+    sys.stdout = orig_stdout
+    f.close()
+    return expand_dims(M_pca, 0)
 
 
 def local_pca(block):

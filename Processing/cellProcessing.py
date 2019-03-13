@@ -117,15 +117,8 @@ def local_pca_on_mask(save_root, numCores=20):
     print_client_links(cluster)
     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
     mask = da.from_zarr(f'{save_root}/mask_map.zarr')
-    z = Y_d.shape[0]
-    for nz in range(z):
-        if os.path.exists(f'{save_root}/masked_local_pca_data_{nz+1}.zarr'):
-            continue
-        print(nz)
-        if os.path.exists(f'{save_root}/masked_local_pca_data_{nz}.zarr'):
-            shutil.rmtree(f'{save_root}/masked_local_pca_data_{nz}.zarr')
-        Y_svd = da.map_blocks(local_pca_block, Y_d[nz], mask[nz], dtype='float32', save_folder=save_root)
-        Y_svd.to_zarr(f'{save_root}/masked_local_pca_data_{nz}.zarr')
+    Y_svd = da.map_blocks(fb_pca_block, Y_d, mask, dtype='float32', save_folder=save_root)
+    Y_svd.to_zarr(f'{save_root}/masked_local_pca_data.zarr')
     cluster.stop_all_jobs()
     cluster.close()
     time.sleep(10)
@@ -281,6 +274,29 @@ def compute_cell_dff_NMF(dir_root, save_root, numCores=20, window=100, percentil
     if not os.path.exists(f'{save_root}/cell_nmf_dff'):
         os.makedirs(f'{save_root}/cell_nmf_dff')
     da.map_blocks(compute_cell_denoise_dff, trans_data_t, pca_data, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, dt=dt, window=window, percentile=percentile).compute()
+    return None
+
+
+def local_pca_on_mask_layer(save_root, numCores=20):
+    from dask.distributed import Client, LocalCluster
+    if not os.path.exists(f'{save_root}/denoise_rlt'):
+        os.makedirs(f'{save_root}/denoise_rlt')
+    cluster, client = fdask.setup_workers(numCores)
+    print_client_links(cluster)
+    Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+    mask = da.from_zarr(f'{save_root}/mask_map.zarr')
+    z = Y_d.shape[0]
+    for nz in range(z):
+        if os.path.exists(f'{save_root}/masked_local_pca_data_{nz+1}.zarr'):
+            continue
+        print(nz)
+        if os.path.exists(f'{save_root}/masked_local_pca_data_{nz}.zarr'):
+            shutil.rmtree(f'{save_root}/masked_local_pca_data_{nz}.zarr')
+        Y_svd = da.map_blocks(local_pca_block, Y_d[nz], mask[nz], dtype='float32', save_folder=save_root)
+        Y_svd.to_zarr(f'{save_root}/masked_local_pca_data_{nz}.zarr')
+    cluster.stop_all_jobs()
+    cluster.close()
+    time.sleep(10)
     return None
 
 
