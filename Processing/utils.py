@@ -159,6 +159,8 @@ def local_pca_block(block, mask, save_folder='.', block_id=None):
     from fish_proc.denoiseLocalPCA.denoise import temporal as svd_patch
     from numpy import expand_dims
     import sys
+    import gc
+    gc.collect()
     
     orig_stdout = sys.stdout    
     fname = f'{save_folder}/denoise_rlt/block_'
@@ -166,12 +168,7 @@ def local_pca_block(block, mask, save_folder='.', block_id=None):
         fname += '_'+str(_)    
     f = open(fname+'_info.txt', 'w')
     sys.stdout = f
-    
-    print('block shape')
-    print(block.shape, flush=True)
-    
-    dx=4
-    nblocks=[20, 20]
+
     if np.prod(block.shape) == 1:
         Y_svd = block[0]
         print('Testing data in dask', flush=True)
@@ -186,15 +183,18 @@ def local_pca_block(block, mask, save_folder='.', block_id=None):
                 return np.zeros(block.shape)
             print('mask shape')
             print(mask.shape, flush=True)
-        W = block.squeeze().copy()
-        W = W - W.mean(axis=-1, keepdims=True)
-        Y_svd, _ = svd_patch(W, nblocks=nblocks, dx=dx, stim_knots=None, stim_delta=0, mask=~mask.squeeze(), is_single_core=True)
-        if mask is not None:
-            print('Set masked area to zero')
-            Y_svd[~mask.squeeze()] = 0
+        print('block shape')
+        print(block.shape, flush=True)
+        dx=4
+        nblocks=[8, 8]
+        Y_svd, _ = svd_patch(block-block.mean(axis=-1, keepdims=True), nblocks=nblocks, dx=dx, stim_knots=None, stim_delta=0, is_single_core=True)
     sys.stdout = orig_stdout
     f.close()
-    return expand_dims(Y_svd, 0)
+    gc.collect()
+    if block.ndim == 4:
+        return expand_dims(Y_svd, 0)
+    else:
+        return Y_svd
 
 
 def local_pca(block):
@@ -209,6 +209,10 @@ def local_pca(block):
 # mask functions
 def intesity_mask(blocks, percentile=40):
     return blocks>np.percentile(blocks, percentile)
+
+
+def intesity_mask_block(blocks, percentile):
+    return blocks>np.percentile(blocks, percentile.squeeze())
 
 
 def snr_mask(Y_svd, std_per=20, snr_per=10):    

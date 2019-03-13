@@ -92,65 +92,43 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20, n
 
     # remove meaning before svd (-- pca)
     if not os.path.exists(f'{save_root}/Y_ave.zarr'):
-        refresh_workers(cluster, numCores=10)
+        refresh_workers(cluster, numCores=60)
         Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
         Y_d_ave = Y_d.mean(axis=-1, keepdims=True, dtype='float32')
         print('Save average data ---')
-        Y_d_ave.to_zarr(f'{save_root}/Y_ave.zarr')  
+        Y_d_ave.to_zarr(f'{save_root}/Y_ave.zarr')
+        
+    if not os.path.exists(f'{save_root}/Y_max.zarr'):
+        refresh_workers(cluster, numCores=60)
+        Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+        Y_d_max = Y_d.max(axis=-1, keepdims=True)
+        print('Save average data ---')
+        Y_d_max.to_zarr(f'{save_root}/Y_max.zarr')  
     cluster.stop_all_jobs()
     time.sleep(10)
     return None
 
 
 def local_pca_on_mask(save_root, numCores=20):
+    from dask.distributed import Client, LocalCluster
     if not os.path.exists(f'{save_root}/denoise_rlt'):
         os.makedirs(f'{save_root}/denoise_rlt')
     cluster, client = fdask.setup_workers(numCores)
     print_client_links(cluster)
     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
     mask = da.from_zarr(f'{save_root}/mask_map.zarr')
-    Y_svd = da.map_blocks(local_pca_block, Y_d, mask, dtype='float32', save_folder=save_root)
-    Y_svd.to_zarr(f'{save_root}/masked_local_pca_data.zarr')
+    z = Y_d.shape[0]
+    for nz in range(z):
+        if os.path.exists(f'{save_root}/masked_local_pca_data_{nz+1}.zarr'):
+            continue
+        print(nz)
+        if os.path.exists(f'{save_root}/masked_local_pca_data_{nz}.zarr'):
+            shutil.rmtree(f'{save_root}/masked_local_pca_data_{nz}.zarr')
+        Y_svd = da.map_blocks(local_pca_block, Y_d[nz], mask[nz], dtype='float32', save_folder=save_root)
+        Y_svd.to_zarr(f'{save_root}/masked_local_pca_data_{nz}.zarr')
     cluster.stop_all_jobs()
     cluster.close()
     time.sleep(10)
-    return None
-
-
-def mask_brain(save_root, percentile=40, dt=5, numCores=20, redo_mask=False):
-    from fish_proc.utils.snr import correlation_pnr
-    if not os.path.exists(f'{save_root}/mask_map.h5') or redo_mask:
-        Y_d_ave_ = da.from_zarr(f'{save_root}/Y_ave.zarr')
-        chunksize = Y_d_ave_.chunksize
-        Y_d_ave_ = Y_d_ave_.rechunk((1, -1, -1, -1))
-        mask =  Y_d_ave_.map_blocks(lambda v: intesity_mask(v, percentile=percentile), dtype='bool')
-        save_h5(f'{save_root}/mask_map.h5', mask.compute(), dtype='bool')
-        mask = mask.rechunk(chunksize)
-        print('Compute and save mask done --')
-    
-    cluster, client = fdask.setup_workers(numCores)
-    print_client_links(cluster)
-    
-    if not os.path.exists(f'{save_root}/masked_local_pca_data.zarr') or redo_mask:
-        Y_svd_ = da.from_zarr(f'{save_root}/local_pca_data.zarr')
-        # _ = Y_svd_.map_blocks(lambda v: mask_blocks(v, mask=mask), dtype='float32')
-        _ = Y_svd_.map_blocks(mask, dtype='float32')   
-        _.to_zarr(f'{save_root}/masked_local_pca_data.zarr', overwrite=True)
-        refresh_workers(cluster, numCores=numCores)
-        print('Compute and save masked data done --')
-    
-    
-    _[:, :, :, ::dt].to_zarr(f'{save_root}/masked_downsampled_local_pca_data.zarr')
-    print('Compute and save downsampled data (in time) done --')
-    cluster.stop_all_jobs()
-    time.sleep(10)
-    
-    Y_svd_t = da.from_zarr(f'{save_root}/masked_downsampled_local_pca_data.zarr')
-    Cn_list = np.zeros(mask.shape).squeeze(axis=-1) #drop last dim
-    for ii in range(Y_svd_t.shape[0]):
-        Cn, _ = correlation_pnr(Y_svd_t[ii], skip_pnr=True)
-        Cn_list[ii] = Cn   
-    save_h5(f'{save_root}/local_correlation_map.h5', Cn_list, dtype='float32')
     return None
 
 
@@ -306,32 +284,69 @@ def compute_cell_dff_NMF(dir_root, save_root, numCores=20, window=100, percentil
     return None
 
 
-def img_t_rechunk(save_root, nsplit = 4):
-    import zarr
-    from numcodecs import Zstd
-    compressor=Zstd(level=1)
-    trans_data_ = zarr.open(f'{save_root}/motion_corrected_data.zarr', mode='r')
-    t, z, x, y= trans_data_.shape
-    trans_data_t = zarr.open(f'{save_root}/motion_corrected_data_by_t.zarr', mode='w',
-                             shape=(z, x, y, t), chunks=(1, x//nsplit, y//nsplit, t),
-                             dtype=np.float32, compressor=compressor)
-    for nz in range(z):
-        print(f'Start process {nz} layer of the imaging stack ----')
-        trans_data_t[nz] = np.concatenate([trans_data_[_, nz, :, :][:, :, None] for _ in range(t) ], axis=-1)
-        print(f'---- finished process {nz} layer of the imaging stack')
-    return None
+# def img_t_rechunk(save_root, nsplit = 4):
+#     import zarr
+#     from numcodecs import Zstd
+#     compressor=Zstd(level=1)
+#     trans_data_ = zarr.open(f'{save_root}/motion_corrected_data.zarr', mode='r')
+#     t, z, x, y= trans_data_.shape
+#     trans_data_t = zarr.open(f'{save_root}/motion_corrected_data_by_t.zarr', mode='w',
+#                              shape=(z, x, y, t), chunks=(1, x//nsplit, y//nsplit, t),
+#                              dtype=np.float32, compressor=compressor)
+#     for nz in range(z):
+#         print(f'Start process {nz} layer of the imaging stack ----')
+#         trans_data_t[nz] = np.concatenate([trans_data_[_, nz, :, :][:, :, None] for _ in range(t) ], axis=-1)
+#         print(f'---- finished process {nz} layer of the imaging stack')
+#     return None
 
 
-def test_img_t_rechunk(save_root):
-    trans_data_ = zarr.open(f'{save_root}/motion_corrected_data.zarr', mode='r')
-    trans_data_t = zarr.open(f'{save_root}/motion_corrected_data_by_t.zarr', mode='r')
-    t, z, x, y = trans_data_.shape
-    z_, x_, y_, t_ =trans_data_t.shape
-    if t==t_ and z==z_ and x==x_ and y==y_:
-        print('Shape of arrays are correct, continue--')
-    nz = np.random.randint(z)
-    nt = np.random.randint(t)
-    if np.array_equal(trans_data_[nt, nz], trans_data_t[nz, :, :, nt]):
-        print('Random selected array are identical, continue remove old data--')
-        shutil.rmtree(f'{save_root}/motion_corrected_data.zarr')
-    return None
+# def test_img_t_rechunk(save_root):
+#     trans_data_ = zarr.open(f'{save_root}/motion_corrected_data.zarr', mode='r')
+#     trans_data_t = zarr.open(f'{save_root}/motion_corrected_data_by_t.zarr', mode='r')
+#     t, z, x, y = trans_data_.shape
+#     z_, x_, y_, t_ =trans_data_t.shape
+#     if t==t_ and z==z_ and x==x_ and y==y_:
+#         print('Shape of arrays are correct, continue--')
+#     nz = np.random.randint(z)
+#     nt = np.random.randint(t)
+#     if np.array_equal(trans_data_[nt, nz], trans_data_t[nz, :, :, nt]):
+#         print('Random selected array are identical, continue remove old data--')
+#         shutil.rmtree(f'{save_root}/motion_corrected_data.zarr')
+#     return None
+
+
+# def mask_brain(save_root, percentile=40, dt=5, numCores=20, redo_mask=False):
+#     from fish_proc.utils.snr import correlation_pnr
+#     if not os.path.exists(f'{save_root}/mask_map.h5') or redo_mask:
+#         Y_d_ave_ = da.from_zarr(f'{save_root}/Y_ave.zarr')
+#         chunksize = Y_d_ave_.chunksize
+#         Y_d_ave_ = Y_d_ave_.rechunk((1, -1, -1, -1))
+#         mask =  Y_d_ave_.map_blocks(lambda v: intesity_mask(v, percentile=percentile), dtype='bool')
+#         save_h5(f'{save_root}/mask_map.h5', mask.compute(), dtype='bool')
+#         mask = mask.rechunk(chunksize)
+#         print('Compute and save mask done --')
+    
+#     cluster, client = fdask.setup_workers(numCores)
+#     print_client_links(cluster)
+    
+#     if not os.path.exists(f'{save_root}/masked_local_pca_data.zarr') or redo_mask:
+#         Y_svd_ = da.from_zarr(f'{save_root}/local_pca_data.zarr')
+#         # _ = Y_svd_.map_blocks(lambda v: mask_blocks(v, mask=mask), dtype='float32')
+#         _ = Y_svd_.map_blocks(mask, dtype='float32')   
+#         _.to_zarr(f'{save_root}/masked_local_pca_data.zarr', overwrite=True)
+#         refresh_workers(cluster, numCores=numCores)
+#         print('Compute and save masked data done --')
+    
+    
+#     _[:, :, :, ::dt].to_zarr(f'{save_root}/masked_downsampled_local_pca_data.zarr')
+#     print('Compute and save downsampled data (in time) done --')
+#     cluster.stop_all_jobs()
+#     time.sleep(10)
+    
+#     Y_svd_t = da.from_zarr(f'{save_root}/masked_downsampled_local_pca_data.zarr')
+#     Cn_list = np.zeros(mask.shape).squeeze(axis=-1) #drop last dim
+#     for ii in range(Y_svd_t.shape[0]):
+#         Cn, _ = correlation_pnr(Y_svd_t[ii], skip_pnr=True)
+#         Cn_list[ii] = Cn   
+#     save_h5(f'{save_root}/local_correlation_map.h5', Cn_list, dtype='float32')
+#     return None
