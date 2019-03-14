@@ -281,7 +281,7 @@ def compute_cell_dff_NMF(save_root, numCores=20, dt=3):
     pca_data = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
     if not os.path.exists(f'{save_root}/cell_nmf_dff'):
         os.makedirs(f'{save_root}/cell_nmf_dff')
-    da.map_blocks(compute_cell_denoise_dff, trans_data_t, pca_data, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, dt=dt).compute()
+    da.map_blocks(compute_cell_denoise_dff, baseline_t, pca_data, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, dt=dt).compute()
     cluster.stop_all_jobs()
     cluster.close()
     return None
