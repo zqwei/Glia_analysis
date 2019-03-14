@@ -148,13 +148,6 @@ def robust_sp_trend(mov):
     return trend(mov)
 
 
-# test code for local_pca
-def local_pca_test(block, block_id=None):
-    # this check number of cpus can be used on each worker
-    import multiprocess as mp
-    return np.ones([1]*len(block_id))*mp.cpu_count()
-
-
 def local_pca_block(block, mask, save_folder='.', block_id=None):
     from fish_proc.denoiseLocalPCA.denoise import temporal as svd_patch
     from numpy import expand_dims
@@ -231,15 +224,6 @@ def fb_pca_block(block, mask_block, save_folder='.', block_id=None):
     return expand_dims(M_pca, 0)
 
 
-def local_pca(block):
-    from fish_proc.denoiseLocalPCA.denoise import temporal as svd_patch
-    from numpy import expand_dims
-    dx=4
-    nblocks=[64, 64]
-    Y_svd, _ = svd_patch(block.squeeze(), nblocks=nblocks, dx=dx, stim_knots=None, stim_delta=0, is_single_core=False)
-    return Y_svd
-
-
 # mask functions
 def intesity_mask(blocks, percentile=40):
     return blocks>np.percentile(blocks, percentile)
@@ -297,7 +281,7 @@ def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None
         return np.zeros([1]*4)
     
     M = block.squeeze().copy()
-    M[mask_block.squeeze()] = 0
+    M[~mask_block.squeeze()] = 0
     Cblock = local_correlations_fft(M, is_mp=False)
 
     if (Cblock>0).sum()==0:
@@ -340,60 +324,6 @@ def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None
     return np.zeros([1]*4)
 
 
-def demix_blocks_old(block, Cblock, save_folder='.', block_id=None):
-    import pickle
-    import sys
-    from fish_proc.demix import superpixel_analysis as sup
-    is_demix = False
-    orig_stdout = sys.stdout
-    
-    fname = f'{save_folder}/demix_rlt/period_Y_demix_block_'
-    for _ in block_id:
-        fname += '_'+str(_)
-        
-    f = open(fname+'_info.txt', 'w')
-    sys.stdout = f
-    
-    if (Cblock>0).sum()==0:
-        print('No components in this block', flush=True)
-        sys.stdout = orig_stdout
-        f.close()
-        return np.zeros([1]*4)
-    
-    if (Cblock[Cblock>0]>0.90).mean()<0.5:
-        cut_off_point=np.percentile(Cblock.ravel(), [99, 95, 85, 65])
-    else:
-        cut_off_point = np.array([0.99, 0.95, 0.90])
-    pass_num_max = (cut_off_point>0).sum()
-    cut_off_point = cut_off_point[:pass_num_max]
-    print(cut_off_point, flush=True)
-    pass_num = pass_num_max
-    while not is_demix and pass_num>=0:
-        try:
-            rlt_= sup.demix_whole_data(block.squeeze(), cut_off_point[pass_num_max-pass_num:], length_cut=[20,15,15,15],
-                                       th=[1,1,1,1], pass_num=pass_num, residual_cut = [0.6,0.6,0.6,0.6],
-                                       corr_th_fix=0.3, max_allow_neuron_size=0.3, merge_corr_thr=cut_off_point[-1],
-                                       merge_overlap_thr=0.6, num_plane=1, patch_size=[20, 20], plot_en=False,
-                                       TF=False, fudge_factor=1, text=False, bg=False, max_iter=50,
-                                       max_iter_fin=100, update_after=10) 
-            is_demix = True
-        except:
-            print(f'fail at pass_num {pass_num}', flush=True)
-            is_demix = False
-            pass_num -= 1
-            
-    sys.stdout = orig_stdout
-    f.close()
-    
-    try:    
-        with open(fname+'_rlt.pkl', 'wb') as f:
-            pickle.dump(rlt_, f)
-    except:
-        pass
-
-    return np.zeros([1]*4)
-
-
 def demix_file_name_block(save_root='.', block_id=None):
     fname = f'{save_root}/demix_rlt/period_Y_demix_block_'
     for _ in block_id:
@@ -413,7 +343,7 @@ def load_A_matrix(save_root='.', block_id=None, min_size=40):
             return None
 
 
-def compute_cell_raw_dff(block, save_root='.', window=100, percentile=20, block_id=None):
+def compute_cell_raw_dff(block_F0, block_dF, save_root='.', block_id=None):
     from fish_proc.utils.demix import recompute_C_matrix
     import pickle
     fname = demix_file_name_block(save_root=save_root, block_id=block_id)
@@ -430,16 +360,9 @@ def compute_cell_raw_dff(block, save_root='.', window=100, percentile=20, block_
     for _ in block_id:
         fsave += '_'+str(_)
     fsave += '_rlt.h5'
-    
-    block_ = block.squeeze(axis=0) # remove z, remaining x, y, t
-    d1, d2, _ = block_.shape
-    F0 = baseline(block_, window=window, percentile=percentile)
-    dF = block_ - F0
-    min_t = np.percentile(block, 0.3, axis=-1)
-    min_t[min_t>0] = 0
-    F0 = F0 - min_t
-    cell_F0 = recompute_C_matrix(F0, A)
-    cell_dF = recompute_C_matrix(dF, A)
+    d1, d2, _ = block_F0.shape
+    cell_F0 = recompute_C_matrix(block_F0.squeeze(axis=0), A)
+    cell_dF = recompute_C_matrix(block_dF.squeeze(axis=0), A)
     A = A.reshape((d1, d2, -1), order="F")
     with File(fsave, 'w') as f:
         f.create_dataset('A', data=A, compression='gzip', chunks=True, shuffle=True)
@@ -464,7 +387,7 @@ def pos_sig_correction(mov, dt, axis_=-1):
     return mov - (mov[:, :, dt]).min(axis=axis_, keepdims=True)
 
 
-def compute_cell_denoise_dff(block, pca_block, save_root='.', dt=5, window=100, percentile=20, block_id=None):
+def compute_cell_denoise_dff(block_F0, block_dF, save_root='.', block_id=None):
     from fish_proc.utils.demix import recompute_C_matrix
     fname = demix_file_name_block(save_root=save_root, block_id=block_id)
     if not os.path.exists(fname):
@@ -480,14 +403,9 @@ def compute_cell_denoise_dff(block, pca_block, save_root='.', dt=5, window=100, 
     for _ in block_id:
         fsave += '_'+str(_)
     fsave += '_rlt.h5'
-    
-    block_ = block.squeeze(axis=0) # remove z, remaining x, y, t
-    d1, d2, _ = block_.shape
-    F0 = baseline(block_, window=window, percentile=percentile)
-    min_t = np.percentile(block, 0.3, axis=-1)
-    min_t[min_t>0] = 0
-    cell_F0 = recompute_C_matrix(F0 - min_t, A)
-    dF = pos_sig_correction(pca_block.squeeze(axis=0), dt) - b.reshape((d1, d2, 1), order="F")
+    d1, d2, _ = block_F0.shape
+    cell_F0 = recompute_C_matrix(block_F0.squeeze(axis=0), A)
+    dF = pos_sig_correction(block_dF.squeeze(axis=0), dt) - b.reshape((d1, d2, 1), order="F")
     cell_dF = recompute_C_matrix(dF, A)
     A = A.reshape((d1, d2, -1), order="F")
     with File(fsave, 'w') as f:

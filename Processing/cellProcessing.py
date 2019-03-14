@@ -147,7 +147,6 @@ def check_fail_block(save_root, dt=0):
 
 def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
     import matplotlib.pyplot as plt
-    import pickle
     Y_d_ave = da.from_zarr(f'{save_root}/Y_max.zarr')
     mask = da.from_zarr(f'{save_root}/mask_map.zarr')
     Y_d_ave_ = Y_d_ave.blocks[block_id].squeeze().compute(scheduler='threads')
@@ -156,7 +155,7 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
     _, xdim, ydim, _ = Y_d_ave.shape
     _, x_, y_, _ = Y_d_ave.chunksize
     try:
-        A_ = load_A_matrix(save_root=save_root, block_id=block_id, min_size=0)
+        A_ = load_A_matrix(save_root=save_root, block_id=block_id, min_size=40)
         A_comp = np.zeros(A_.shape[0])
         A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + 1
         # plt.imshow(Y_d_ave_, cmap=plt.cm.gray)
@@ -185,7 +184,42 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
     return None
 
 
-def compute_cell_dff_pixels(dir_root, save_root, numCores=20, window=100, percentile=20):
+def check_demix_cells_layer(save_root, nlayer, nsplit=8):
+    import matplotlib.pyplot as plt
+    Y_d_ave = da.from_zarr(f'{save_root}/Y_max.zarr')
+    Y_d_ave_ = Y_d_ave.blocks[nlayer].squeeze().compute(scheduler='threads')
+    v_max = np.percentile(Y_d_ave_, 90)
+    _, xdim, ydim, _ = Y_d_ave.shape
+    _, x_, y_, _ = Y_d_ave.chunksize
+    A_mat = np.zeros((xdim, ydim))
+    n_comp = 1
+    for nx in range(nsplit):
+        for ny in range(nsplit):
+            try:
+                A_ = load_A_matrix(save_root=save_root, block_id=(nlayer, nx, ny, 0), min_size=0)
+                A_comp = np.zeros(A_.shape[0])
+                A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + n_comp
+                A_mat[x_*nx:x_*(nx+1), y_*ny:y_*(ny+1)] = A_comp.reshape(y_, x_).T
+                n_comp = A_mat.max()+1
+            except:
+                pass
+    
+    plt.figure(figsize=(8, 8))
+    A_mat[A_mat>0] = A_mat[A_mat>0]%60+1
+    print(A_mat.max())
+    plt.imshow(A_mat, cmap=plt.cm.nipy_spectral_r)
+    plt.title('Components')
+    plt.axis('off')
+    plt.show()
+    
+    plt.figure(figsize=(8, 8))
+    plt.imshow(Y_d_ave_, vmax=v_max)
+    plt.axis('off')
+    plt.show()
+    return None
+
+
+def compute_cell_dff_pixels(save_root, numCores=20):
     '''
       1. local pca denoise (\delta F signal)
       2. baseline
@@ -195,29 +229,18 @@ def compute_cell_dff_pixels(dir_root, save_root, numCores=20, window=100, percen
     # set worker
     cluster, client = fdask.setup_workers(numCores)
     print_client_links(cluster)
-    files = sorted(glob(dir_root+'/*.h5'))
-    chunks = File(files[0],'r')['default'].shape
-    data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
-    # pixel denoise
-    cameraInfo = getCameraInfo(dir_root)
-    denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraInfo=cameraInfo))
-    trans_affine_ = np.load(f'{save_root}/trans_affs.npy')
-    trans_affine_ = da.from_array(trans_affine_, chunks=(1,4,4))
-    # apply affine transform
-    trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
-    # baseline
-    chunk_x, chunk_y = chunks[-2:]
-    trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, 1, 1, -1))
-    baseline_t = trans_data_t.map_blocks(lambda v: baseline(v, window=window, percentile=percentile), dtype='float32')
+    trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+    Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+    baseline_t = trans_data_t - Y_d
     min_t = trans_data_t.map_blocks(lambda v: np.min(np.percentile(v, 0.3), 0), dtype='float32')
-    dff = (trans_data_t-baseline_t)/(baseline_t-min_t)
+    dff = Y_d/(baseline_t-min_t)
     dff.to_zarr(f'{save_root}/pixel_dff.zarr', overwrite=True)
     cluster.stop_all_jobs()
     cluster.close()
     return None
 
 
-def compute_cell_dff_raw(dir_root, save_root, numCores=20, window=100, percentile=20, nsplit=8):
+def compute_cell_dff_raw(save_root, numCores=20):
     '''
       1. local pca denoise (\delta F signal)
       2. baseline
@@ -225,27 +248,24 @@ def compute_cell_dff_raw(dir_root, save_root, numCores=20, window=100, percentil
       4. dff
     '''
     # set worker
+    if not os.path.exists(f'{save_root}/cell_raw_dff'):
+        os.mkdir(f'{save_root}/cell_raw_dff')
     cluster, client = fdask.setup_workers(numCores)
-    files = sorted(glob(dir_root+'/*.h5'))
-    chunks = File(files[0],'r')['default'].shape
-    data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
-    # pixel denoise
-    cameraInfo = getCameraInfo(dir_root)
-    denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraInfo=cameraInfo))
-    trans_affine_ = np.load(f'{save_root}/trans_affs.npy')
-    trans_affine_ = da.from_array(trans_affine_, chunks=(1,4,4))
-    # apply affine transform
-    trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
-    # baseline
-    chunk_x, chunk_y = chunks[-2:]
-    trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunk_x//nsplit, chunk_y//nsplit, -1))
+    print_client_links(cluster)
+    trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+    Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+    baseline_t = trans_data_t - Y_d
+    min_t = trans_data_t.map_blocks(lambda v: np.min(np.percentile(v, 0.3), 0), dtype='float32')
+    baseline_t = baseline_t - min_t
     if not os.path.exists(f'{save_root}/cell_raw_dff'):
         os.makedirs(f'{save_root}/cell_raw_dff')
-    trans_data_t.map_blocks(compute_cell_raw_dff, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, window=window, percentile=percentile).compute()
+    da.map_blocks(compute_cell_raw_dff, baseline_t, Y_d, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root).compute()
+    cluster.stop_all_jobs()
+    cluster.close()
     return None
 
 
-def compute_cell_dff_NMF(dir_root, save_root, numCores=20, window=100, percentile=20, nsplit=8, dt=5):
+def compute_cell_dff_NMF(save_root, numCores=20):
     '''
       1. local pca denoise (\delta F signal)
       2. baseline
@@ -253,23 +273,18 @@ def compute_cell_dff_NMF(dir_root, save_root, numCores=20, window=100, percentil
       4. dff
     '''
     # set worker
+    if not os.path.exists(f'{save_root}/cell_nmf_dff'):
+        os.mkdir(f'{save_root}/cell_nmf_dff')
     cluster, client = fdask.setup_workers(numCores)
-    files = sorted(glob(dir_root+'/*.h5'))
-    chunks = File(files[0],'r')['default'].shape
-    data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
-    # pixel denoise
-    cameraInfo = getCameraInfo(dir_root)
-    denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraInfo=cameraInfo))
-    trans_affine_ = np.load(f'{save_root}/trans_affs.npy')
-    trans_affine_ = da.from_array(trans_affine_, chunks=(1,4,4))
-    # apply affine transform
-    trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
-    # baseline
-    chunk_x, chunk_y = chunks[-2:]
-    trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunk_x//nsplit, chunk_y//nsplit, -1))
-    pca_data = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr').rechunk((1, chunk_x//nsplit, chunk_y//nsplit, -1))
+    trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+    Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+    baseline_t = trans_data_t - Y_d
+    min_t = trans_data_t.map_blocks(lambda v: np.min(np.percentile(v, 0.3), 0), dtype='float32')
+    baseline_t = baseline_t - min_t
     if not os.path.exists(f'{save_root}/cell_nmf_dff'):
         os.makedirs(f'{save_root}/cell_nmf_dff')
     da.map_blocks(compute_cell_denoise_dff, trans_data_t, pca_data, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, dt=dt, window=window, percentile=percentile).compute()
+    cluster.stop_all_jobs()
+    cluster.close()
     return None
 
