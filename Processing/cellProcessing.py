@@ -122,7 +122,7 @@ def local_pca_on_mask(save_root, numCores=20):
     return None
 
 
-def demix_cells(save_root, nsplit = 8, numCores = 200):
+def demix_cells(save_root, dt, is_skip=True, numCores = 200):
     '''
       1. local pca denoise
       2. cell segmentation
@@ -130,55 +130,55 @@ def demix_cells(save_root, nsplit = 8, numCores = 200):
     cluster, client = fdask.setup_workers(numCores)
     print_client_links(cluster)
 
-    Y_svd_ = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
-    Cn_list = File(f'{save_root}/local_correlation_map.h5', 'r')['default'].value
-    _, xdim, ydim = Cn_list.shape
-    Cn_list = da.from_array(np.expand_dims(Cn_list, -1), chunks=(1, xdim//nsplit, ydim//nsplit, -1))
-    Y_svd_ = Y_svd_.rechunk((1, xdim//nsplit, ydim//nsplit, -1))
+    Y_svd = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
+    Y_svd = Y_svd[:, :, :, ::dt]
+    mask = da.from_zarr(f'{save_root}/mask_map.zarr')
     if not os.path.exists(f'{save_root}/demix_rlt/'):
         os.mkdir(f'{save_root}/demix_rlt/')
-    da.map_blocks(lambda a, b:demix_blocks(a, b, save_folder=save_root), Y_svd_, Cn_list, chunks=(1, 1, 1, 1), dtype='int8').compute()
+    da.map_blocks(demix_blocks, Y_svd, mask, chunks=(1, 1, 1, 1), dtype='int8', save_folder=save_root, is_skip=is_skip).compute()
     cluster.stop_all_jobs()
-    cluster.close()
     return None
 
 
-def check_demix_cells(save_root, block_id, nsplit=8, plot_global=True):
+def check_fail_block(save_root, dt=0):
+    file = glob(f'{save_root}/masked_local_pca_data.zarr/*.partial')
+    print(file)
+
+
+def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
     import matplotlib.pyplot as plt
     import pickle
-    Y_d_ave_ = da.from_array(File(f'{save_root}/Y_2dnorm_ave.h5', 'r')['default'], chunks=(1, -1, -1, -1))
-    mask_ = da.from_array(File(f'{save_root}/mask_map.h5', 'r')['default'], chunks=(1, -1, -1, -1))
-    Cn_list = File(f'{save_root}/local_correlation_map.h5', 'r')['default'].value
-    _, xdim, ydim = Cn_list.shape
-    Cn_list = da.from_array(np.expand_dims(Cn_list, -1), chunks=(1, xdim//nsplit, ydim//nsplit, -1))
-    Y_d_ave_ = Y_d_ave_.rechunk((1, xdim//nsplit, ydim//nsplit, -1))
-    mask_ = mask_.rechunk((1, xdim//nsplit, ydim//nsplit, -1))
+    Y_d_ave = da.from_zarr(f'{save_root}/Y_max.zarr')
+    mask = da.from_zarr(f'{save_root}/mask_map.zarr')
+    Y_d_ave_ = Y_d_ave.blocks[block_id].squeeze().compute(scheduler='threads')
+    mask_ = mask.blocks[block_id].squeeze().compute(scheduler='threads')
     v_max = np.percentile(Y_d_ave_, 90)
-    fname = f'{save_root}/demix_rlt/period_Y_demix_block_'
-    for _ in block_id:
-        fname += '_'+str(_)
-    if os.path.exists(fname+'_rlt.pkl'):
-        with open(fname+'_rlt.pkl', 'rb') as f:
-            try:
-                rlt_ = pickle.load(f)
-                A = rlt_['fin_rlt']['a']
-                A_ = A[:, (A>0).sum(axis=0)>40]
-                A_comp = np.zeros(A_.shape[0])
-                A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + 1
-                plt.imshow(Y_d_ave_block.squeeze(), cmap=plt.cm.gray)
-                plt.imshow(A_comp.reshape(ydim//nsplit, xdim//nsplit).T, cmap=plt.cm.nipy_spectral_r, alpha=0.7)
-                plt.axis('off')
-                plt.show()
-            except:
-                print('None components')
-    plt.imshow(Y_d_ave_block.squeeze())
+    _, xdim, ydim, _ = Y_d_ave.shape
+    _, x_, y_, _ = Y_d_ave.chunksize
+    try:
+        A_ = load_A_matrix(save_root=save_root, block_id=block_id, min_size=0)
+        A_comp = np.zeros(A_.shape[0])
+        A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + 1
+        # plt.imshow(Y_d_ave_, cmap=plt.cm.gray)
+        plt.imshow(A_comp.reshape(y_, x_).T, cmap=plt.cm.nipy_spectral_r)
+        if plot_mask:
+            plt.imshow(mask_, cmap='gray', alpha=0.5)
+        plt.title('Components')
+        plt.axis('off')
+        plt.show()
+    except:
+        print('No components')
+    
+    plt.imshow(Y_d_ave_, vmax=v_max)
+    plt.title('Max Intensity')
     plt.axis('off')
     plt.show()
+    
     if plot_global:
         area_mask = np.zeros((xdim, ydim)).astype('bool')
         area_mask[block_id[1]*x_:block_id[1]*x_+x_, block_id[2]*y_:block_id[2]*y_+y_]=True
         plt.figure(figsize=(16, 16))
-        plt.imshow(Y_d_ave_[block_id[0]].squeeze(), vmax=v_max)
+        plt.imshow(Y_d_ave[block_id[0]].squeeze().compute(scheduler='threads'), vmax=v_max)
         plt.imshow(area_mask, cmap='gray', alpha=0.3)
         plt.axis('off')
         plt.show()
@@ -273,93 +273,3 @@ def compute_cell_dff_NMF(dir_root, save_root, numCores=20, window=100, percentil
     da.map_blocks(compute_cell_denoise_dff, trans_data_t, pca_data, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, dt=dt, window=window, percentile=percentile).compute()
     return None
 
-
-def local_pca_on_mask_layer(save_root, numCores=20):
-    from dask.distributed import Client, LocalCluster
-    if not os.path.exists(f'{save_root}/denoise_rlt'):
-        os.makedirs(f'{save_root}/denoise_rlt')
-    cluster, client = fdask.setup_workers(numCores)
-    print_client_links(cluster)
-    Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
-    mask = da.from_zarr(f'{save_root}/mask_map.zarr')
-    z = Y_d.shape[0]
-    for nz in range(z):
-        if os.path.exists(f'{save_root}/masked_local_pca_data_{nz+1}.zarr'):
-            continue
-        print(nz)
-        if os.path.exists(f'{save_root}/masked_local_pca_data_{nz}.zarr'):
-            shutil.rmtree(f'{save_root}/masked_local_pca_data_{nz}.zarr')
-        Y_svd = da.map_blocks(local_pca_block, Y_d[nz], mask[nz], dtype='float32', save_folder=save_root)
-        Y_svd.to_zarr(f'{save_root}/masked_local_pca_data_{nz}.zarr')
-    cluster.stop_all_jobs()
-    cluster.close()
-    time.sleep(10)
-    return None
-
-
-# def img_t_rechunk(save_root, nsplit = 4):
-#     import zarr
-#     from numcodecs import Zstd
-#     compressor=Zstd(level=1)
-#     trans_data_ = zarr.open(f'{save_root}/motion_corrected_data.zarr', mode='r')
-#     t, z, x, y= trans_data_.shape
-#     trans_data_t = zarr.open(f'{save_root}/motion_corrected_data_by_t.zarr', mode='w',
-#                              shape=(z, x, y, t), chunks=(1, x//nsplit, y//nsplit, t),
-#                              dtype=np.float32, compressor=compressor)
-#     for nz in range(z):
-#         print(f'Start process {nz} layer of the imaging stack ----')
-#         trans_data_t[nz] = np.concatenate([trans_data_[_, nz, :, :][:, :, None] for _ in range(t) ], axis=-1)
-#         print(f'---- finished process {nz} layer of the imaging stack')
-#     return None
-
-
-# def test_img_t_rechunk(save_root):
-#     trans_data_ = zarr.open(f'{save_root}/motion_corrected_data.zarr', mode='r')
-#     trans_data_t = zarr.open(f'{save_root}/motion_corrected_data_by_t.zarr', mode='r')
-#     t, z, x, y = trans_data_.shape
-#     z_, x_, y_, t_ =trans_data_t.shape
-#     if t==t_ and z==z_ and x==x_ and y==y_:
-#         print('Shape of arrays are correct, continue--')
-#     nz = np.random.randint(z)
-#     nt = np.random.randint(t)
-#     if np.array_equal(trans_data_[nt, nz], trans_data_t[nz, :, :, nt]):
-#         print('Random selected array are identical, continue remove old data--')
-#         shutil.rmtree(f'{save_root}/motion_corrected_data.zarr')
-#     return None
-
-
-# def mask_brain(save_root, percentile=40, dt=5, numCores=20, redo_mask=False):
-#     from fish_proc.utils.snr import correlation_pnr
-#     if not os.path.exists(f'{save_root}/mask_map.h5') or redo_mask:
-#         Y_d_ave_ = da.from_zarr(f'{save_root}/Y_ave.zarr')
-#         chunksize = Y_d_ave_.chunksize
-#         Y_d_ave_ = Y_d_ave_.rechunk((1, -1, -1, -1))
-#         mask =  Y_d_ave_.map_blocks(lambda v: intesity_mask(v, percentile=percentile), dtype='bool')
-#         save_h5(f'{save_root}/mask_map.h5', mask.compute(), dtype='bool')
-#         mask = mask.rechunk(chunksize)
-#         print('Compute and save mask done --')
-    
-#     cluster, client = fdask.setup_workers(numCores)
-#     print_client_links(cluster)
-    
-#     if not os.path.exists(f'{save_root}/masked_local_pca_data.zarr') or redo_mask:
-#         Y_svd_ = da.from_zarr(f'{save_root}/local_pca_data.zarr')
-#         # _ = Y_svd_.map_blocks(lambda v: mask_blocks(v, mask=mask), dtype='float32')
-#         _ = Y_svd_.map_blocks(mask, dtype='float32')   
-#         _.to_zarr(f'{save_root}/masked_local_pca_data.zarr', overwrite=True)
-#         refresh_workers(cluster, numCores=numCores)
-#         print('Compute and save masked data done --')
-    
-    
-#     _[:, :, :, ::dt].to_zarr(f'{save_root}/masked_downsampled_local_pca_data.zarr')
-#     print('Compute and save downsampled data (in time) done --')
-#     cluster.stop_all_jobs()
-#     time.sleep(10)
-    
-#     Y_svd_t = da.from_zarr(f'{save_root}/masked_downsampled_local_pca_data.zarr')
-#     Cn_list = np.zeros(mask.shape).squeeze(axis=-1) #drop last dim
-#     for ii in range(Y_svd_t.shape[0]):
-#         Cn, _ = correlation_pnr(Y_svd_t[ii], skip_pnr=True)
-#         Cn_list[ii] = Cn   
-#     save_h5(f'{save_root}/local_correlation_map.h5', Cn_list, dtype='float32')
-#     return None

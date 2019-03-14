@@ -272,7 +272,75 @@ def mask_blocks(block, mask=None):
     return _
 
 
-def demix_blocks(block, Cblock, save_folder='.', block_id=None):
+def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None):
+    import pickle
+    import sys
+    from fish_proc.demix import superpixel_analysis as sup
+    from fish_proc.utils.snr import local_correlations_fft
+    is_demix = False
+    orig_stdout = sys.stdout
+        
+    fname = f'{save_folder}/demix_rlt/period_Y_demix_block_'
+    for _ in block_id:
+        fname += '_'+str(_)
+        
+    if os.path.exists(fname+'_rlt.pkl') and is_skip:
+        return np.zeros([1]*4)
+        
+    f = open(fname+'_info.txt', 'w')
+    sys.stdout = f
+    
+    if mask_block.sum() ==0:
+        print('No valid pixel in this block', flush=True)
+        sys.stdout = orig_stdout
+        f.close()
+        return np.zeros([1]*4)
+    
+    M = block.squeeze().copy()
+    M[mask_block.squeeze()] = 0
+    Cblock = local_correlations_fft(M, is_mp=False)
+
+    if (Cblock>0).sum()==0:
+        print('No components in this block', flush=True)
+        sys.stdout = orig_stdout
+        f.close()
+        return np.zeros([1]*4)
+    
+    if (Cblock[Cblock>0]>0.90).mean()<0.5:
+        cut_off_point=np.percentile(Cblock.ravel(), [99, 95, 85, 65])
+    else:
+        cut_off_point = np.array([0.99, 0.95, 0.90])
+    pass_num_max = (cut_off_point>0).sum()
+    cut_off_point = cut_off_point[:pass_num_max]
+    print(cut_off_point, flush=True)
+    pass_num = pass_num_max
+    while not is_demix and pass_num>=0:
+        try:
+            rlt_= sup.demix_whole_data(M, cut_off_point[pass_num_max-pass_num:], length_cut=[20,15,15,15],
+                                       th=[1,1,1,1], pass_num=pass_num, residual_cut = [0.6,0.6,0.6,0.6],
+                                       corr_th_fix=0.3, max_allow_neuron_size=0.3, merge_corr_thr=cut_off_point[-1],
+                                       merge_overlap_thr=0.6, num_plane=1, patch_size=[20, 20], plot_en=False,
+                                       TF=False, fudge_factor=1, text=False, bg=False, max_iter=50,
+                                       max_iter_fin=70, update_after=10) 
+            is_demix = True
+        except:
+            print(f'fail at pass_num {pass_num}', flush=True)
+            is_demix = False
+            pass_num -= 1
+            
+    sys.stdout = orig_stdout
+    f.close()
+    
+    try:    
+        with open(fname+'_rlt.pkl', 'wb') as f:
+            pickle.dump(rlt_, f)
+    except:
+        pass
+
+    return np.zeros([1]*4)
+
+
+def demix_blocks_old(block, Cblock, save_folder='.', block_id=None):
     import pickle
     import sys
     from fish_proc.demix import superpixel_analysis as sup
@@ -334,8 +402,9 @@ def demix_file_name_block(save_root='.', block_id=None):
 
 
 def load_A_matrix(save_root='.', block_id=None, min_size=40):
+    import pickle
     fname = demix_file_name_block(save_root=save_root, block_id=block_id)
-    with open(fname+'_rlt.pkl', 'rb') as f:
+    with open(fname, 'rb') as f:
         try:
             rlt_ = pickle.load(f)
             A = rlt_['fin_rlt']['a']
@@ -346,6 +415,7 @@ def load_A_matrix(save_root='.', block_id=None, min_size=40):
 
 def compute_cell_raw_dff(block, save_root='.', window=100, percentile=20, block_id=None):
     from fish_proc.utils.demix import recompute_C_matrix
+    import pickle
     fname = demix_file_name_block(save_root=save_root, block_id=block_id)
     if not os.path.exists(fname):
         return np.zeros([1]*4)
