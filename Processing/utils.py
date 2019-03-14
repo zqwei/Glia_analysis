@@ -143,6 +143,12 @@ def baseline(data, window=100, percentile=15, downsample=1, axis=-1):
     return bl
 
 
+def baseline_from_Yd(block_t, block_d):
+    min_t = np.percentile(block_t, 0.3, axis=-1, keepdims=True)
+    min_t[min_t>0] = 0
+    return block_t - block_d - min_t
+
+
 def robust_sp_trend(mov):
     from fish_proc.denoiseLocalPCA.detrend import trend
     return trend(mov)
@@ -350,7 +356,7 @@ def compute_cell_raw_dff(block_F0, block_dF, save_root='.', block_id=None):
     if not os.path.exists(fname):
         return np.zeros([1]*4)
     else:
-        A, b = load_A_matrix(save_root=save_root, block_id=block_id)
+        A = load_A_matrix(save_root=save_root, block_id=block_id)
         if A is None:
             return np.zeros([1]*4)
         if A.shape[1] == 0:
@@ -360,7 +366,7 @@ def compute_cell_raw_dff(block_F0, block_dF, save_root='.', block_id=None):
     for _ in block_id:
         fsave += '_'+str(_)
     fsave += '_rlt.h5'
-    d1, d2, _ = block_F0.shape
+    _, d1, d2, _ = block_F0.shape
     cell_F0 = recompute_C_matrix(block_F0.squeeze(axis=0), A)
     cell_dF = recompute_C_matrix(block_dF.squeeze(axis=0), A)
     A = A.reshape((d1, d2, -1), order="F")
@@ -372,9 +378,9 @@ def compute_cell_raw_dff(block_F0, block_dF, save_root='.', block_id=None):
     return np.zeros([1]*4)
 
 
-def load_Ab_matrix(save_root='.', block_id=None, min_size=40):
-    fname = demix_file_name_block(save_root=save_root, block_id=block_id)
-    with open(fname+'_rlt.pkl', 'rb') as f:
+def load_Ab_matrix(fname, min_size=40):
+    import pickle
+    with open(fname, 'rb') as f:
         try:
             rlt_ = pickle.load(f)
             A = rlt_['fin_rlt']['a']
@@ -387,23 +393,23 @@ def pos_sig_correction(mov, dt, axis_=-1):
     return mov - (mov[:, :, dt]).min(axis=axis_, keepdims=True)
 
 
-def compute_cell_denoise_dff(block_F0, block_dF, save_root='.', block_id=None):
+def compute_cell_denoise_dff(block_F0, block_dF, save_root='.', dt=5, block_id=None):
     from fish_proc.utils.demix import recompute_C_matrix
+    import pickle
     fname = demix_file_name_block(save_root=save_root, block_id=block_id)
     if not os.path.exists(fname):
         return np.zeros([1]*4)
     else:
-        A = load_Ab_matrix(save_root=save_root, block_id=block_id)
+        A, b = load_Ab_matrix(fname, min_size=40)
         if A is None:
             return np.zeros([1]*4)
         if A.shape[1] == 0:
             return np.zeros([1]*4)
-    
     fsave = f'{save_root}/cell_nmf_dff/period_Y_demix_block_'
     for _ in block_id:
         fsave += '_'+str(_)
     fsave += '_rlt.h5'
-    d1, d2, _ = block_F0.shape
+    _, d1, d2, _ = block_F0.shape
     cell_F0 = recompute_C_matrix(block_F0.squeeze(axis=0), A)
     dF = pos_sig_correction(block_dF.squeeze(axis=0), dt) - b.reshape((d1, d2, 1), order="F")
     cell_dF = recompute_C_matrix(dF, A)

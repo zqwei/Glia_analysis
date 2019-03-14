@@ -159,6 +159,7 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
         A_comp = np.zeros(A_.shape[0])
         A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + 1
         # plt.imshow(Y_d_ave_, cmap=plt.cm.gray)
+        A_comp[A_comp>0] = A_comp[A_comp>0]%20+1
         plt.imshow(A_comp.reshape(y_, x_).T, cmap=plt.cm.nipy_spectral_r)
         if plot_mask:
             plt.imshow(mask_, cmap='gray', alpha=0.5)
@@ -196,7 +197,7 @@ def check_demix_cells_layer(save_root, nlayer, nsplit=8):
     for nx in range(nsplit):
         for ny in range(nsplit):
             try:
-                A_ = load_A_matrix(save_root=save_root, block_id=(nlayer, nx, ny, 0), min_size=0)
+                A_ = load_A_matrix(save_root=save_root, block_id=(nlayer, nx, ny, 0), min_size=40)
                 A_comp = np.zeros(A_.shape[0])
                 A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + n_comp
                 A_mat[x_*nx:x_*(nx+1), y_*ny:y_*(ny+1)] = A_comp.reshape(y_, x_).T
@@ -231,9 +232,8 @@ def compute_cell_dff_pixels(save_root, numCores=20):
     print_client_links(cluster)
     trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
-    baseline_t = trans_data_t - Y_d
-    min_t = trans_data_t.map_blocks(lambda v: np.min(np.percentile(v, 0.3), 0), dtype='float32')
-    dff = Y_d/(baseline_t-min_t)
+    baseline_t = da.map_blocks(baseline_from_Yd, trans_data_t, Y_d, dtype='float32')
+    dff = Y_d/baseline_t
     dff.to_zarr(f'{save_root}/pixel_dff.zarr', overwrite=True)
     cluster.stop_all_jobs()
     cluster.close()
@@ -254,18 +254,16 @@ def compute_cell_dff_raw(save_root, numCores=20):
     print_client_links(cluster)
     trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
-    baseline_t = trans_data_t - Y_d
-    min_t = trans_data_t.map_blocks(lambda v: np.min(np.percentile(v, 0.3), 0), dtype='float32')
-    baseline_t = baseline_t - min_t
+    baseline_t = da.map_blocks(baseline_from_Yd, trans_data_t, Y_d, dtype='float32')
     if not os.path.exists(f'{save_root}/cell_raw_dff'):
         os.makedirs(f'{save_root}/cell_raw_dff')
-    da.map_blocks(compute_cell_raw_dff, baseline_t, Y_d, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root).compute()
+    da.map_blocks(compute_cell_raw_dff, baseline_t, Y_d, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root).compute()#.compute(scheduler='single-threaded')
     cluster.stop_all_jobs()
     cluster.close()
     return None
 
 
-def compute_cell_dff_NMF(save_root, numCores=20):
+def compute_cell_dff_NMF(save_root, numCores=20, dt=3):
     '''
       1. local pca denoise (\delta F signal)
       2. baseline
@@ -276,14 +274,14 @@ def compute_cell_dff_NMF(save_root, numCores=20):
     if not os.path.exists(f'{save_root}/cell_nmf_dff'):
         os.mkdir(f'{save_root}/cell_nmf_dff')
     cluster, client = fdask.setup_workers(numCores)
+    print_client_links(cluster)
     trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
-    baseline_t = trans_data_t - Y_d
-    min_t = trans_data_t.map_blocks(lambda v: np.min(np.percentile(v, 0.3), 0), dtype='float32')
-    baseline_t = baseline_t - min_t
+    baseline_t = da.map_blocks(baseline_from_Yd, trans_data_t, Y_d, dtype='float32')
+    pca_data = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
     if not os.path.exists(f'{save_root}/cell_nmf_dff'):
         os.makedirs(f'{save_root}/cell_nmf_dff')
-    da.map_blocks(compute_cell_denoise_dff, trans_data_t, pca_data, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, dt=dt, window=window, percentile=percentile).compute()
+    da.map_blocks(compute_cell_denoise_dff, trans_data_t, pca_data, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, dt=dt).compute()
     cluster.stop_all_jobs()
     cluster.close()
     return None
