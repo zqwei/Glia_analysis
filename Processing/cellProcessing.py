@@ -52,7 +52,7 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20, n
     # save and compute reference image
     print('Compute reference image ---')
     if not os.path.exists(f'{save_root}/motion_fix_.h5'):
-        med_win = len(denoised_data)
+        med_win = len(denoised_data)//2
         ref_img = denoised_data[med_win-50:med_win+50].mean(axis=0).compute()
         save_h5(f'{save_root}/motion_fix_.h5', ref_img, dtype='float16')
         
