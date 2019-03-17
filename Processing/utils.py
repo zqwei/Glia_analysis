@@ -149,6 +149,15 @@ def baseline_from_Yd(block_t, block_d):
     return block_t - block_d - min_t
 
 
+def baseline_correct(block_b, block_t):
+    min_t = np.percentile(block_t, 0.3, axis=-1, keepdims=True)
+    min_t[min_t>0] = 0
+    min_b = np.min(block_b-min_t, axis=-1, keepdims=True)
+    min_b[min_b<=0] = min_b[min_b<=0] - 0.01
+    min_b[min_b>0] = 0
+    return block_b - min_t - min_b
+
+
 def robust_sp_trend(mov):
     from fish_proc.denoiseLocalPCA.detrend import trend
     return trend(mov)
@@ -196,37 +205,20 @@ def local_pca_block(block, mask, save_folder='.', block_id=None):
         return Y_svd
     
     
-def fb_pca_block(block, mask_block, save_folder='.', block_id=None):
+def fb_pca_block(block, mask_block, block_id=None):
     # using fb pca instead of local pca from fish
     from fbpca import pca
     from numpy import expand_dims
-    from fish_proc.utils.memory import get_process_memory, clear_variables
-    import sys
-    orig_stdout = sys.stdout
-    fname = f'{save_folder}/denoise_rlt/block_'
-    for _ in block_id:
-        fname += '_'+str(_)    
-    f = open(fname+'_info.txt', 'w')
-    sys.stdout = f
-    
     if mask_block.sum()==0:
-        print('No valid pixels')
-        sys.stdout = orig_stdout
-        f.close()
-        return np.zeros(block.shape)
-    
-    get_process_memory()
+        return np.zeros(block.shape)    
     M = (block-block.mean(axis=-1, keepdims=True)).squeeze()
+    M[~mask_block.squeeze()] = 0
     dimsM = M.shape
     M = M.reshape((np.prod(dimsM[:-1]),dimsM[-1]),order='F')
-    k = min(min(M.shape)//4, 300)
+    k = min(min(M.shape)//4, 600)
     [U, S, Va] = pca(M.T, k=k, n_iter=20, raw=True)
-    clear_variables(M)
-    get_process_memory()
     M_pca = U.dot(np.diag(S).dot(Va))
     M_pca = M_pca.T.reshape(dimsM, order='F')
-    sys.stdout = orig_stdout
-    f.close()
     return expand_dims(M_pca, 0)
 
 
@@ -297,7 +289,7 @@ def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None
         return np.zeros([1]*4)
     
     if (Cblock[Cblock>0]>0.90).mean()<0.5:
-        cut_off_point=np.percentile(Cblock.ravel(), [99, 95, 85, 65])
+        cut_off_point=np.percentile(Cblock.ravel(), [99, 95, 85, 75])
     else:
         cut_off_point = np.array([0.99, 0.95, 0.90])
     pass_num_max = (cut_off_point>0).sum()
@@ -306,12 +298,12 @@ def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None
     pass_num = pass_num_max
     while not is_demix and pass_num>=0:
         try:
-            rlt_= sup.demix_whole_data(M, cut_off_point[pass_num_max-pass_num:], length_cut=[20,15,15,15],
+            rlt_= sup.demix_whole_data(M, cut_off_point[pass_num_max-pass_num:], length_cut=[60, 40, 40, 40],
                                        th=[1,1,1,1], pass_num=pass_num, residual_cut = [0.6,0.6,0.6,0.6],
-                                       corr_th_fix=0.3, max_allow_neuron_size=0.3, merge_corr_thr=cut_off_point[-1],
-                                       merge_overlap_thr=0.6, num_plane=1, patch_size=[20, 20], plot_en=False,
+                                       corr_th_fix=0.3, max_allow_neuron_size=0.05, merge_corr_thr=cut_off_point[-1],
+                                       merge_overlap_thr=0.6, num_plane=1, patch_size=[10, 10], plot_en=False,
                                        TF=False, fudge_factor=1, text=False, bg=False, max_iter=50,
-                                       max_iter_fin=70, update_after=10) 
+                                       max_iter_fin=90, update_after=40) 
             is_demix = True
         except:
             print(f'fail at pass_num {pass_num}', flush=True)
