@@ -255,6 +255,74 @@ def mask_blocks(block, mask=None):
 
 
 def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None):
+    # this uses old parameter set up
+    import pickle
+    import sys
+    from fish_proc.demix import superpixel_analysis as sup
+    from fish_proc.utils.snr import local_correlations_fft
+    is_demix = False
+    orig_stdout = sys.stdout
+        
+    fname = f'{save_folder}/demix_rlt/period_Y_demix_block_'
+    for _ in block_id:
+        fname += '_'+str(_)
+        
+    if os.path.exists(fname+'_rlt.pkl') and is_skip:
+        return np.zeros([1]*4)
+        
+    f = open(fname+'_info.txt', 'w')
+    sys.stdout = f
+    
+    if mask_block.sum() ==0:
+        print('No valid pixel in this block', flush=True)
+        sys.stdout = orig_stdout
+        f.close()
+        os.remove(fname+'_info.txt')
+        return np.zeros([1]*4)
+    
+    M = block.squeeze().copy()
+    M[~mask_block.squeeze()] = 0
+    Cblock = local_correlations_fft(M, is_mp=False)
+
+    if (Cblock>0).sum()==0:
+        print('No components in this block', flush=True)
+        sys.stdout = orig_stdout
+        f.close()
+        os.remove(fname+'_info.txt')
+        return np.zeros([1]*4)
+    
+    cut_off_point = [0.95, 0.9, 0.85, 0.70]
+    pass_num = 4
+    pass_num_max = 4
+    while not is_demix and pass_num>=0:
+        try:
+            rlt_= sup.demix_whole_data(M, cut_off_point[pass_num_max-pass_num:], length_cut=[20, 20, 40, 40],
+                                       th=[1,1,1,1], pass_num=pass_num, residual_cut = [0.6,0.6,0.6,0.6],
+                                       corr_th_fix=0.3, max_allow_neuron_size=0.05, merge_corr_thr=0.90,
+                                       merge_overlap_thr=0.6, num_plane=1, patch_size=[10, 10], plot_en=False,
+                                       TF=False, fudge_factor=1, text=False, bg=False, max_iter=50,
+                                       max_iter_fin=90, update_after=40) 
+            is_demix = True
+        except:
+            print(f'fail at pass_num {pass_num}', flush=True)
+            is_demix = False
+            pass_num -= 1
+            
+    sys.stdout = orig_stdout
+    f.close()
+    os.remove(fname+'_info.txt')
+    
+    try:    
+        with open(fname+'_rlt.pkl', 'wb') as f:
+            pickle.dump(rlt_, f)
+    except:
+        pass
+
+    return np.zeros([1]*4)
+
+
+def demix_blocks_old(block, mask_block, save_folder='.', is_skip=True, block_id=None):
+    # this uses old parameter set up
     import pickle
     import sys
     from fish_proc.demix import superpixel_analysis as sup
