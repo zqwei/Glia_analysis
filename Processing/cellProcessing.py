@@ -11,7 +11,7 @@ from utils import *
 import fish_proc.utils.dask_ as fdask
 from fish_proc.utils.getCameraInfo import getCameraInfo
 import time
-cameraNoiseMat = '/groups/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
+cameraNoiseMat = '/nrs/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
 
 
 def refresh_workers(cluster, numCores=20):
@@ -29,7 +29,7 @@ def print_client_links(cluster):
     return None
 
 
-def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20, nsplit = 4):
+def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, numCores=20, window=100, percentile=20, nsplit = 4):
     '''
       1. pixel denoise
       2. registration -- save registration file
@@ -47,7 +47,7 @@ def preprocessing(dir_root, save_root, numCores=20, window=100, percentile=20, n
 
     # pixel denoise
     cameraInfo = getCameraInfo(dir_root)
-    denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraInfo=cameraInfo))
+    denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraNoiseMat=cameraNoiseMat, cameraInfo=cameraInfo))
 
     # save and compute reference image
     print('Compute reference image ---')

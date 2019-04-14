@@ -5,9 +5,7 @@ from glob import glob
 from h5py import File
 from fish_proc.utils.getCameraInfo import getCameraInfo
 
-cameraNoiseMat = '/groups/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
-
-def pixelDenoiseImag(img, cameraInfo=None):
+def pixelDenoiseImag(img, cameraNoiseMat='', cameraInfo=None):
     from fish_proc.pixelwiseDenoising.simpleDenioseTool import simpleDN
     from scipy.ndimage.filters import median_filter
     win_ = 3
@@ -97,7 +95,7 @@ def save_h5(filename, data, dtype='float32'):
     with File(filename, 'w') as f:
         f.create_dataset('default', data=data.astype(dtype), compression='gzip', chunks=True, shuffle=True)
         f.close()
-        
+
 
 def save_h5_rescale(filename, data, reset_max_int=65535):
     ## np.iinfo(np.uint16).max = 65535
@@ -109,7 +107,7 @@ def save_h5_rescale(filename, data, reset_max_int=65535):
         f.create_dataset('scale', data=np.array([data_min, data_max]), chunks=True, shuffle=True)
         f.close()
 
-        
+
 def baseline(data, window=100, percentile=15, downsample=1, axis=-1):
     """
     Get the baseline of a numpy array using a windowed percentile filter with optional downsampling
@@ -169,11 +167,11 @@ def local_pca_block(block, mask, save_folder='.', block_id=None):
     import sys
     import gc
     gc.collect()
-    
-    orig_stdout = sys.stdout    
+
+    orig_stdout = sys.stdout
     fname = f'{save_folder}/denoise_rlt/block_'
     for _ in block_id:
-        fname += '_'+str(_)    
+        fname += '_'+str(_)
     f = open(fname+'_info.txt', 'w')
     sys.stdout = f
 
@@ -203,14 +201,14 @@ def local_pca_block(block, mask, save_folder='.', block_id=None):
         return expand_dims(Y_svd, 0)
     else:
         return Y_svd
-    
-    
+
+
 def fb_pca_block(block, mask_block, block_id=None):
     # using fb pca instead of local pca from fish
     from fbpca import pca
     from numpy import expand_dims
     if mask_block.sum()==0:
-        return np.zeros(block.shape)    
+        return np.zeros(block.shape)
     M = (block-block.mean(axis=-1, keepdims=True)).squeeze()
     M[~mask_block.squeeze()] = 0
     dimsM = M.shape
@@ -231,12 +229,12 @@ def intesity_mask_block(blocks, percentile):
     return blocks>np.percentile(blocks, percentile.squeeze())
 
 
-def snr_mask(Y_svd, std_per=20, snr_per=10):    
+def snr_mask(Y_svd, std_per=20, snr_per=10):
     Y_svd = Y_svd.squeeze()
     d1, d2, _ = Y_svd.shape
     mean_ = Y_svd.mean(axis=-1,keepdims=True)
     sn, _ = get_noise_fft(Y_svd - mean_,noise_method='logmexp')
-    SNR_ = Y_svd.var(axis=-1)/sn**2    
+    SNR_ = Y_svd.var(axis=-1)/sn**2
     Y_d_std = Y_svd.std(axis=-1)
     std_thres = np.percentile(Y_d_std.ravel(), std_per)
     mask = Y_d_std<=std_thres
@@ -262,24 +260,24 @@ def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None
     from fish_proc.utils.snr import local_correlations_fft
     is_demix = False
     orig_stdout = sys.stdout
-        
+
     fname = f'{save_folder}/demix_rlt/period_Y_demix_block_'
     for _ in block_id:
         fname += '_'+str(_)
-        
+
     if os.path.exists(fname+'_rlt.pkl') and is_skip:
         return np.zeros([1]*4)
-        
+
     f = open(fname+'_info.txt', 'w')
     sys.stdout = f
-    
+
     if mask_block.sum() ==0:
         print('No valid pixel in this block', flush=True)
         sys.stdout = orig_stdout
         f.close()
         os.remove(fname+'_info.txt')
         return np.zeros([1]*4)
-    
+
     M = block.squeeze().copy()
     M[~mask_block.squeeze()] = 0
     Cblock = local_correlations_fft(M, is_mp=False)
@@ -290,7 +288,7 @@ def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None
         f.close()
         os.remove(fname+'_info.txt')
         return np.zeros([1]*4)
-    
+
     cut_off_point = [0.95, 0.9, 0.85, 0.70]
     pass_num = 4
     pass_num_max = 4
@@ -301,18 +299,18 @@ def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None
                                        corr_th_fix=0.3, max_allow_neuron_size=0.05, merge_corr_thr=0.90,
                                        merge_overlap_thr=0.6, num_plane=1, patch_size=[10, 10], plot_en=False,
                                        TF=False, fudge_factor=1, text=False, bg=False, max_iter=50,
-                                       max_iter_fin=90, update_after=40) 
+                                       max_iter_fin=90, update_after=40)
             is_demix = True
         except:
             print(f'fail at pass_num {pass_num}', flush=True)
             is_demix = False
             pass_num -= 1
-            
+
     sys.stdout = orig_stdout
     f.close()
     os.remove(fname+'_info.txt')
-    
-    try:    
+
+    try:
         with open(fname+'_rlt.pkl', 'wb') as f:
             pickle.dump(rlt_, f)
     except:
@@ -329,23 +327,23 @@ def demix_blocks_old(block, mask_block, save_folder='.', is_skip=True, block_id=
     from fish_proc.utils.snr import local_correlations_fft
     is_demix = False
     orig_stdout = sys.stdout
-        
+
     fname = f'{save_folder}/demix_rlt/period_Y_demix_block_'
     for _ in block_id:
         fname += '_'+str(_)
-        
+
     if os.path.exists(fname+'_rlt.pkl') and is_skip:
         return np.zeros([1]*4)
-        
+
     f = open(fname+'_info.txt', 'w')
     sys.stdout = f
-    
+
     if mask_block.sum() ==0:
         print('No valid pixel in this block', flush=True)
         sys.stdout = orig_stdout
         f.close()
         return np.zeros([1]*4)
-    
+
     M = block.squeeze().copy()
     M[~mask_block.squeeze()] = 0
     Cblock = local_correlations_fft(M, is_mp=False)
@@ -355,7 +353,7 @@ def demix_blocks_old(block, mask_block, save_folder='.', is_skip=True, block_id=
         sys.stdout = orig_stdout
         f.close()
         return np.zeros([1]*4)
-    
+
     if (Cblock[Cblock>0]>0.90).mean()<0.5:
         cut_off_point=np.percentile(Cblock.ravel(), [99, 95, 85, 75])
     else:
@@ -371,17 +369,17 @@ def demix_blocks_old(block, mask_block, save_folder='.', is_skip=True, block_id=
                                        corr_th_fix=0.3, max_allow_neuron_size=0.05, merge_corr_thr=cut_off_point[-1],
                                        merge_overlap_thr=0.6, num_plane=1, patch_size=[10, 10], plot_en=False,
                                        TF=False, fudge_factor=1, text=False, bg=False, max_iter=50,
-                                       max_iter_fin=90, update_after=40) 
+                                       max_iter_fin=90, update_after=40)
             is_demix = True
         except:
             print(f'fail at pass_num {pass_num}', flush=True)
             is_demix = False
             pass_num -= 1
-            
+
     sys.stdout = orig_stdout
     f.close()
-    
-    try:    
+
+    try:
         with open(fname+'_rlt.pkl', 'wb') as f:
             pickle.dump(rlt_, f)
     except:
@@ -421,7 +419,7 @@ def compute_cell_raw_dff(block_F0, block_dF, save_root='.', block_id=None):
             return np.zeros([1]*4)
         if A.shape[1] == 0:
             return np.zeros([1]*4)
-    
+
     fsave = f'{save_root}/cell_raw_dff/period_Y_demix_block_'
     for _ in block_id:
         fsave += '_'+str(_)
