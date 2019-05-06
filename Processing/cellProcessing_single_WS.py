@@ -61,7 +61,6 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, numCores=2
     # compute affine transform
     print('Registration to reference image ---')
     if not os.path.exists(f'{save_root}/trans_affs.npy'):
-        # refresh_workers(cluster, numCores=numCores)
         ref_img = File(f'{save_root}/motion_fix_.h5', 'r')['default'].value
         ref_img = ref_img.max(axis=0, keepdims=True)
         trans_affine = denoised_data.map_blocks(lambda x: estimate_rigid2d(x, fixed=ref_img), dtype='float32', drop_axis=(3), chunks=(1,4,4)).compute()
@@ -75,26 +74,24 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, numCores=2
     # apply affine transform
     if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
         print('Apply registration ---')
-        # if numCores<700:
-        #     numCores_ = 700
-        # else:
-        #     numCores_ = numCores
-        # refresh_workers(cluster, numCores=numCores)
-        trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
-        trans_data_t = trans_data_.transpose((1, 2, 3, 0)).rechunk((1, chunks[1]//nsplit, chunks[2]//nsplit, -1))
-        trans_data_t.to_zarr(f'{save_root}/motion_corrected_data.zarr')
+        if not os.path.exists(f'{save_root}/motion_corrected_data_tmp.zarr'):
+            trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
+            trans_data_.to_zarr(f'{save_root}/motion_corrected_data_tmp.zarr')
+        # time * z * x * y
+        # trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data_tmp.zarr').rechunk((-1, 1, chunks[1]//nsplit, chunks[2]//nsplit))
+        # trans_data_t.to_zarr(f'{save_root}/motion_corrected_data.zarr')
+        # print('Remove temporal files of registration')
+        # shutil.rmtree(f'{save_root}/motion_corrected_data_tmp.zarr')
 
     # detrend
-    if not os.path.exists(f'{save_root}/detrend_data.zarr'):
-        print('Compute detrend data ---')
-        # refresh_workers(cluster, numCores=trans_data_t.shape[0]*nsplit*nsplit+1)
-        # refresh_workers(cluster, numCores=numCores)
-        trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
-        Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
-        Y_d.to_zarr(f'{save_root}/detrend_data.zarr')
+#     if not os.path.exists(f'{save_root}/detrend_data.zarr'):
+#         print('Compute detrend data ---')
+#         trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+#         Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
+#         Y_d.to_zarr(f'{save_root}/detrend_data.zarr')
     
-    # cluster.stop_all_jobs()
-    # time.sleep(10)
+    cluster.stop_all_jobs()
+    time.sleep(10)
     return None
 
 
