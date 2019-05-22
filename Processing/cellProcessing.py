@@ -14,6 +14,13 @@ import time
 cameraNoiseMat = '/nrs/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
 
 
+def force_bkill_dask():
+    try:
+        get_ipython().run_cell_magic('bash', '', 'bkill -q normal 0\n')
+    except:
+        get_ipython().run_cell_magic('bash', '', 'bjobs\n')
+        
+
 def refresh_workers(cluster, numCores=20):
     try:
         cluster.stop_all_jobs()
