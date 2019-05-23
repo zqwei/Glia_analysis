@@ -19,7 +19,7 @@ def force_bkill_dask():
         get_ipython().run_cell_magic('bash', '', 'bkill -q normal 0\n')
     except:
         get_ipython().run_cell_magic('bash', '', 'bjobs\n')
-        
+
 
 def refresh_workers(cluster, numCores=20):
     try:
@@ -62,7 +62,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, numCores=2
         med_win = len(denoised_data)//2
         ref_img = denoised_data[med_win-50:med_win+50].mean(axis=0).compute()
         save_h5(f'{save_root}/motion_fix_.h5', ref_img, dtype='float16')
-        
+
     print('--- Done computing reference image')
 
     # compute affine transform
@@ -97,7 +97,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, numCores=2
         trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
         Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
         Y_d.to_zarr(f'{save_root}/detrend_data.zarr')
-    
+
     cluster.stop_all_jobs()
     time.sleep(10)
     return None
@@ -173,12 +173,12 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
         plt.show()
     except:
         print('No components')
-    
+
 #     plt.imshow(Y_d_ave_, vmax=v_max)
 #     plt.title('Max Intensity')
 #     plt.axis('off')
 #     plt.show()
-    
+
     if plot_global:
         area_mask = np.zeros((xdim, ydim)).astype('bool')
         area_mask[block_id[1]*x_:block_id[1]*x_+x_, block_id[2]*y_:block_id[2]*y_+y_]=True
@@ -213,7 +213,7 @@ def check_demix_cells_layer(save_root, nlayer, nsplit=8):
                 n_comp = A_mat.max()+1
             except:
                 pass
-    
+
     plt.figure(figsize=(8, 8))
     A_mat[A_mat>0] = A_mat[A_mat>0]%60+1
     plt.imshow(A_mat, cmap=plt.cm.nipy_spectral_r)
@@ -221,7 +221,7 @@ def check_demix_cells_layer(save_root, nlayer, nsplit=8):
     plt.title('Components')
     plt.axis('off')
     plt.show()
-    
+
     plt.figure(figsize=(8, 8))
     plt.imshow(Y_d_ave_, vmax=v_max)
     plt.title('Max Intensity')
@@ -295,4 +295,3 @@ def compute_cell_dff_NMF(save_root, numCores=20, dt=3):
     cluster.stop_all_jobs()
     cluster.close()
     return None
-

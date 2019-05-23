@@ -14,22 +14,13 @@ import time
 cameraNoiseMat = '/nrs/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
 
 
-def refresh_workers(cluster, numCores=20):
-    try:
-        cluster.stop_all_jobs()
-        time.sleep(10)
-    except:
-        pass
-    cluster.start_workers(numCores)
-    return None
-
 def print_client_links(cluster):
     print(f'Scheduler: {cluster.scheduler_address}')
     print(f'Dashboard link: {cluster.dashboard_link}')
     return None
 
 
-def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, numCores=20, window=100, percentile=20, nsplit = 4):
+def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100, percentile=20, nsplit = 4):
     '''
       1. pixel denoise
       2. registration -- save registration file
@@ -38,7 +29,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, numCores=2
     '''
 
     # set worker
-    cluster, client = fdask.setup_workers(numCores)
+    cluster, client = fdask.setup_workers(is_local=True)
     print_client_links(cluster)
 
     files = sorted(glob(dir_root+'/*.h5'))
@@ -84,13 +75,13 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, numCores=2
         # shutil.rmtree(f'{save_root}/motion_corrected_data_tmp.zarr')
 
     # detrend
-#     if not os.path.exists(f'{save_root}/detrend_data.zarr'):
-#         print('Compute detrend data ---')
-#         trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
-#         Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
-#         Y_d.to_zarr(f'{save_root}/detrend_data.zarr')
+    if not os.path.exists(f'{save_root}/detrend_data.zarr'):
+        print('Compute detrend data ---')
+        trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+        Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
+        Y_d.to_zarr(f'{save_root}/detrend_data.zarr')
     
-    cluster.stop_all_jobs()
+    fdask.terminate_workers(cluster, client)
     time.sleep(10)
     return None
 
