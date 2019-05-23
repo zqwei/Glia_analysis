@@ -46,7 +46,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
         med_win = len(denoised_data)//2
         ref_img = denoised_data[med_win-50:med_win+50].mean(axis=0).compute()
         save_h5(f'{save_root}/motion_fix_.h5', ref_img, dtype='float16')
-        
+
     print('--- Done computing reference image')
 
     # compute affine transform
@@ -65,14 +65,10 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
     # apply affine transform
     if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
         print('Apply registration ---')
-        if not os.path.exists(f'{save_root}/motion_corrected_data_tmp.zarr'):
-            trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
-            trans_data_.to_zarr(f'{save_root}/motion_corrected_data_tmp.zarr')
+        trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
         # time * z * x * y
-        # trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data_tmp.zarr').rechunk((-1, 1, chunks[1]//nsplit, chunks[2]//nsplit))
-        # trans_data_t.to_zarr(f'{save_root}/motion_corrected_data.zarr')
-        # print('Remove temporal files of registration')
-        # shutil.rmtree(f'{save_root}/motion_corrected_data_tmp.zarr')
+        trans_data_t = trans_data_.rechunk((-1, 1, chunks[1]//nsplit, chunks[2]//nsplit))
+        trans_data_t.to_zarr(f'{save_root}/motion_corrected_data.zarr')
 
     # detrend
     if not os.path.exists(f'{save_root}/detrend_data.zarr'):
@@ -80,7 +76,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
         trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
         Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
         Y_d.to_zarr(f'{save_root}/detrend_data.zarr')
-    
+
     fdask.terminate_workers(cluster, client)
     time.sleep(10)
     return None
@@ -156,12 +152,12 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
         plt.show()
     except:
         print('No components')
-    
+
 #     plt.imshow(Y_d_ave_, vmax=v_max)
 #     plt.title('Max Intensity')
 #     plt.axis('off')
 #     plt.show()
-    
+
     if plot_global:
         area_mask = np.zeros((xdim, ydim)).astype('bool')
         area_mask[block_id[1]*x_:block_id[1]*x_+x_, block_id[2]*y_:block_id[2]*y_+y_]=True
@@ -196,7 +192,7 @@ def check_demix_cells_layer(save_root, nlayer, nsplit=8):
                 n_comp = A_mat.max()+1
             except:
                 pass
-    
+
     plt.figure(figsize=(8, 8))
     A_mat[A_mat>0] = A_mat[A_mat>0]%60+1
     plt.imshow(A_mat, cmap=plt.cm.nipy_spectral_r)
@@ -204,7 +200,7 @@ def check_demix_cells_layer(save_root, nlayer, nsplit=8):
     plt.title('Components')
     plt.axis('off')
     plt.show()
-    
+
     plt.figure(figsize=(8, 8))
     plt.imshow(Y_d_ave_, vmax=v_max)
     plt.title('Max Intensity')
@@ -278,4 +274,3 @@ def compute_cell_dff_NMF(save_root, numCores=20, dt=3):
     cluster.stop_all_jobs()
     cluster.close()
     return None
-
