@@ -1,16 +1,14 @@
 import numpy as np
 import pandas as pd
-import os, sys
+import os, sys, gc, shutil, time
 from glob import glob
 from h5py import File
 import warnings
 warnings.filterwarnings('ignore')
 import dask.array as da
-import shutil
 from utils import *
 import fish_proc.utils.dask_ as fdask
 from fish_proc.utils.getCameraInfo import getCameraInfo
-import time
 cameraNoiseMat = '/nrs/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
 
 
@@ -20,7 +18,7 @@ def print_client_links(cluster):
     return None
 
 
-def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100, percentile=20, nsplit = 4):
+def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100, percentile=20, nsplit = (4, 4), dask_tmp=None, memory_limit=0):
     '''
       1. pixel denoise
       2. registration -- save registration file
@@ -29,7 +27,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
     '''
 
     # set worker
-    cluster, client = fdask.setup_workers(is_local=True)
+    cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
     print_client_links(cluster)
 
     files = sorted(glob(dir_root+'/*.h5'))
@@ -65,17 +63,34 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
     # apply affine transform
     if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
         print('Apply registration ---')
-        trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
-        # time * z * x * y
-        trans_data_t = trans_data_.rechunk((-1, 1, chunks[1]//nsplit, chunks[2]//nsplit))
-        trans_data_t.to_zarr(f'{save_root}/motion_corrected_data.zarr')
+        if not os.path.exists(f'{save_root}/motion_corrected_data_tmp.zarr'):
+            trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=('auto', *denoised_data.shape[1:]), dtype='float32')
+            trans_data_.to_zarr(f'{save_root}/motion_corrected_data_tmp.zarr')
+            del trans_data_
+        # there is memory issue to load data all together for this transpose on local machine
+        # a solution is to do it layer by layer
 
-    # detrend
-    if not os.path.exists(f'{save_root}/detrend_data.zarr'):
-        print('Compute detrend data ---')
-        trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
-        Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
-        Y_d.to_zarr(f'{save_root}/detrend_data.zarr')
+        # load data
+        trans_data_ = da.from_zarr(f'{save_root}/motion_corrected_data_tmp.zarr')
+        # get z info
+        num_z = trans_data_.shape[1]
+        for nz in range(num_z):
+            print('starting to rechunk layer %03d'%(nz))
+            trans_data_t_z = trans_data_[:, nz].rechunk((-1, chunks[1]//nsplit[0], chunks[2]//nsplit[1])).transpose((1, 2, 0))
+            trans_data_t_z.to_zarr(save_root+'/motion_corrected_data_layer_%03d.zarr'%(nz))
+            del trans_data_t_z
+            gc.collect()
+            print('finishing rechunking layer %03d'%(nz))
+        print('Remove temporal files of registration')
+        shutil.rmtree(f'{save_root}/motion_corrected_data_tmp.zarr')
+
+    # # detrend
+    # if not os.path.exists(f'{save_root}/detrend_data.zarr'):
+    #     print('Compute detrend data ---')
+    #     trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+    #     Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
+    #     Y_d.to_zarr(f'{save_root}/detrend_data.zarr')
+    #     del Y_d
 
     fdask.terminate_workers(cluster, client)
     time.sleep(10)
