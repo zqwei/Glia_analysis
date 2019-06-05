@@ -77,12 +77,13 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
         # get z info
         num_z = trans_data_.shape[1]
         for nz in range(num_z):
-            print('starting to rechunk layer %03d'%(nz))
-            trans_data_t_z = trans_data_[:, nz].rechunk((-1, chunks[1]//nsplit[0], chunks[2]//nsplit[1])).transpose((1, 2, 0))
-            trans_data_t_z.to_zarr(save_root+'/motion_corrected_data_layer_%03d.zarr'%(nz))
-            del trans_data_t_z
-            gc.collect()
-            print('finishing rechunking layer %03d'%(nz))
+            if not os.path.exists(save_root+'/motion_corrected_data_layer_%03d.zarr'%(nz)):
+                print('starting to rechunk layer %03d'%(nz))
+                trans_data_t_z = trans_data_[:, nz].rechunk((-1, chunks[1]//nsplit[0], chunks[2]//nsplit[1])).transpose((1, 2, 0))
+                trans_data_t_z.to_zarr(save_root+'/motion_corrected_data_layer_%03d.zarr'%(nz))
+                del trans_data_t_z
+                gc.collect()
+                print('finishing rechunking layer %03d'%(nz))
         print('Remove temporal files of registration')
         shutil.rmtree(f'{save_root}/motion_corrected_data_tmp.zarr')
 
