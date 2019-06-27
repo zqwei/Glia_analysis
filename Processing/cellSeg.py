@@ -18,8 +18,14 @@ baseline_percentile = 20
 baseline_window = 400   # number of frames
 cameraNoiseMat = '/nrs/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
 
-preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=baseline_window, 
-              percentile=baseline_percentile, nsplit=nsplit, dask_tmp=dask_tmp, memory_limit=memory_limit)
+if not os.path.exists(f'{save_root}/detrend_data.zarr'):
+    preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=baseline_window, 
+                  percentile=baseline_percentile, nsplit=nsplit, dask_tmp=dask_tmp, memory_limit=memory_limit)
 
+if not os.path.exists(f'{save_root}/masked_local_pca_data.zarr'):
+    local_pca_on_mask(save_root, is_dff=False, dask_tmp=dask_tmp, memory_limit=memory_limit)
 
-local_pca_on_mask(save_root, is_dff=False, dask_tmp=dask_tmp, memory_limit=memory_limit)
+dt = 3
+is_skip = False
+
+demix_cells(save_root, dt, is_skip=is_skip, dask_tmp=dask_tmp, memory_limit=memory_limit)
