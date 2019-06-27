@@ -109,7 +109,6 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
 
 
 def local_pca_on_mask(save_root, is_dff=False, dask_tmp=None, memory_limit=0):
-    from dask.distributed import Client, LocalCluster
     cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
     print_client_links(cluster)
     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
@@ -119,24 +118,26 @@ def local_pca_on_mask(save_root, is_dff=False, dask_tmp=None, memory_limit=0):
     mask = da.from_zarr(f'{save_root}/mask_map.zarr')
     Y_svd = da.map_blocks(fb_pca_block, Y_d, mask, dtype='float32')
     Y_svd.to_zarr(f'{save_root}/masked_local_pca_data.zarr', overwrite=True)
+    fdask.terminate_workers(cluster, client)
+    time.sleep(10)
     return None
 
 
-def demix_cells(save_root, dt, is_skip=True, numCores = 200):
+def demix_cells(save_root, dt, is_skip=True, dask_tmp=None, memory_limit=0):
     '''
       1. local pca denoise
       2. cell segmentation
     '''
-    cluster, client = fdask.setup_workers(numCores)
+    cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
     print_client_links(cluster)
-
     Y_svd = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
     Y_svd = Y_svd[:, :, :, ::dt]
     mask = da.from_zarr(f'{save_root}/mask_map.zarr')
     if not os.path.exists(f'{save_root}/demix_rlt/'):
         os.mkdir(f'{save_root}/demix_rlt/')
     da.map_blocks(demix_blocks, Y_svd, mask, chunks=(1, 1, 1, 1), dtype='int8', save_folder=save_root, is_skip=is_skip).compute()
-    cluster.stop_all_jobs()
+    fdask.terminate_workers(cluster, client)
+    time.sleep(10)
     return None
 
 
@@ -165,12 +166,13 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
         A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + 1
         A_comp[A_comp>0] = A_comp[A_comp>0]%20+1
         plt.imshow(Y_d_ave_, vmax=v_max, cmap='gray')
-        plt.imshow(A_comp.reshape(y_, x_).T, cmap=plt.cm.nipy_spectral_r, alpha=1.0)
+        plt.imshow(A_comp.reshape(y_, x_).T, cmap=plt.cm.nipy_spectral_r, alpha=0.4)
 #         A_comp = A_.sum(axis=-1)
 #         plt.imshow(A_comp.reshape(y_, x_).T)
 #         for n in range(A_.shape[-1]):
 #             plt.imshow(A_[:, n].reshape(y_, x_).T)
 #             plt.show()
+        plt.show()
         if plot_mask:
             plt.imshow(mask_, cmap='gray', alpha=0.5)
         plt.title('Components')
@@ -178,12 +180,10 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
         plt.show()
     except:
         print('No components')
-
 #     plt.imshow(Y_d_ave_, vmax=v_max)
 #     plt.title('Max Intensity')
 #     plt.axis('off')
 #     plt.show()
-
     if plot_global:
         area_mask = np.zeros((xdim, ydim)).astype('bool')
         area_mask[block_id[1]*x_:block_id[1]*x_+x_, block_id[2]*y_:block_id[2]*y_+y_]=True
@@ -195,22 +195,22 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
     return None
 
 
-def check_demix_cells_layer(save_root, nlayer, nsplit=8):
+def check_demix_cells_layer(save_root, nlayer, nsplit = (10, 16)):
     import matplotlib.pyplot as plt
     Y_d_ave = da.from_zarr(f'{save_root}/Y_max.zarr')
     Y_d_ave_ = Y_d_ave.blocks[nlayer].squeeze().compute(scheduler='threads')
-    v_max = np.percentile(Y_d_ave_, 99.9)
+    v_max = np.percentile(Y_d_ave_, 95)
     _, xdim, ydim, _ = Y_d_ave.shape
     _, x_, y_, _ = Y_d_ave.chunksize
     A_mat = np.zeros((xdim, ydim))
     n_comp = 1
-    for nx in range(nsplit):
-        for ny in range(nsplit):
+    for nx in range(nsplit[0]):
+        for ny in range(nsplit[1]):
             try:
                 A_ = load_A_matrix(save_root=save_root, block_id=(nlayer, nx, ny, 0), min_size=0)
                 for n in range(A_.shape[-1]):
                     n_max = A_[:, n].max()
-                    A_[A_[:,n]<n_max*0.2, n] = 0
+                    A_[A_[:,n]<n_max*0, n] = 0
                 A_comp = np.zeros(A_.shape[0])
                 A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + n_comp
                 A_mat[x_*nx:x_*(nx+1), y_*ny:y_*(ny+1)] =A_comp.reshape(y_, x_).T
@@ -218,6 +218,47 @@ def check_demix_cells_layer(save_root, nlayer, nsplit=8):
                 n_comp = A_mat.max()+1
             except:
                 pass
+
+    plt.figure(figsize=(8, 8))
+    A_mat[A_mat>0] = A_mat[A_mat>0]%60+1
+    plt.imshow(A_mat, cmap=plt.cm.nipy_spectral_r)
+#     plt.imshow(A_mat, vmax=A_mat.max()*0.6)
+    plt.title('Components')
+    plt.axis('off')
+    plt.show()
+
+    plt.figure(figsize=(8, 8))
+    plt.imshow(Y_d_ave_, vmax=v_max)
+    plt.title('Max Intensity')
+    plt.axis('off')
+    plt.show()
+    return None
+
+
+def check_demix_cells_whole_brain(save_root, nsplit = (10, 16)):
+    import matplotlib.pyplot as plt
+    Y_d_ave = da.from_zarr(f'{save_root}/Y_max.zarr')
+    Y_d_ave_ = Y_d_ave.max(axis=0).squeeze().compute(scheduler='threads')
+    v_max = np.percentile(Y_d_ave_, 95)
+    ldim, xdim, ydim, _ = Y_d_ave.shape
+    _, x_, y_, _ = Y_d_ave.chunksize
+    A_mat = np.zeros((xdim, ydim))
+    n_comp = 1
+    for nlayer in range(ldim):
+        for nx in range(nsplit[0]):
+            for ny in range(nsplit[1]):
+                try:
+                    A_ = load_A_matrix(save_root=save_root, block_id=(nlayer, nx, ny, 0), min_size=0)
+                    for n in range(A_.shape[-1]):
+                        n_max = A_[:, n].max()
+                        A_[A_[:,n]<n_max*0, n] = 0
+                    A_comp = np.zeros(A_.shape[0])
+                    A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + n_comp
+                    A_mat[x_*nx:x_*(nx+1), y_*ny:y_*(ny+1)] =A_comp.reshape(y_, x_).T
+    #                 A_mat[x_*nx:x_*(nx+1), y_*ny:y_*(ny+1)] = A_.sum(axis=-1).reshape(y_, x_).T
+                    n_comp = A_mat.max()+1
+                except:
+                    pass
 
     plt.figure(figsize=(8, 8))
     A_mat[A_mat>0] = A_mat[A_mat>0]%60+1
