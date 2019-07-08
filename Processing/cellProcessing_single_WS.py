@@ -18,7 +18,7 @@ def print_client_links(cluster):
     return None
 
 
-def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100, percentile=20, nsplit = (4, 4), dask_tmp=None, memory_limit=0):
+def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100, percentile=20, nsplit = (4, 4), dask_tmp=None, memory_limit=0, is_bz2=False):
     '''
       1. pixel denoise
       2. registration -- save registration file
@@ -31,13 +31,36 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
     print_client_links(cluster)
     # status forwarding ssh -L 8000:localhost:8787 user@remote
     # ssh -L 8000:localhost:8787 weiz@ahrensm-ws2
-
-    files = sorted(glob(dir_root+'/*.h5'))
-    chunks = File(files[0],'r')['default'].shape
-    data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
+    
+    if not is_bz2:
+        files = sorted(glob(dir_root+'/*.h5'))
+        chunks = File(files[0],'r')['default'].shape
+        data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
+        cameraInfo = getCameraInfo(dir_root)
+    else:
+        import dask
+        import xml.etree.ElementTree as ET
+        from bz2file import load_bz2file
+        dims = ET.parse(dir_root+'/ch0.xml')
+        root = dims.getroot()
+        for info in root.findall('info'):
+            if info.get('dimensions'):
+                dims = info.get('dimensions')
+        dims = dims.split('x')
+        dims = [int(float(num)) for num in dims]
+        files = sorted(glob(dir_root+'/*.stack.bz2'))
+        imread = dask.delayed(lambda v: load_bz2file(v, dims), pure=True)
+        lazy_data = [imread(fn) for fn in files] 
+        sample = lazy_data[0].compute()
+        data = da.stack([da.from_delayed(fn, shape=sample.shape, dtype=sample.dtype) for fn in lazy_data])
+        cameraInfo = getCameraInfo(dir_root)
+        pixel_x0, pixel_x1, pixel_y0, pixel_y1 = [int(_) for _ in cameraInfo['camera_roi'].split('_')]
+        pixel_x0 = pixel_x0-1
+        pixel_y0 = pixel_y0-1
+        cameraInfo['camera_roi'] = '%d_%d_%d_%d'%(pixel_x0, pixel_x1, pixel_y0, pixel_y1)
+        chunks = dims
 
     # pixel denoise
-    cameraInfo = getCameraInfo(dir_root)
     denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraNoiseMat=cameraNoiseMat, cameraInfo=cameraInfo))
 
     # save and compute reference image
