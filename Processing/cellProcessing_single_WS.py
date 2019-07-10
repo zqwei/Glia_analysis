@@ -58,7 +58,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
         pixel_x0 = pixel_x0-1
         pixel_y0 = pixel_y0-1
         cameraInfo['camera_roi'] = '%d_%d_%d_%d'%(pixel_x0, pixel_x1, pixel_y0, pixel_y1)
-        chunks = dims
+        chunks = sample.shape
 
     # pixel denoise
     denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraNoiseMat=cameraNoiseMat, cameraInfo=cameraInfo))
