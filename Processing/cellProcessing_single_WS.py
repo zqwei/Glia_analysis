@@ -31,7 +31,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
     print_client_links(cluster)
     # status forwarding ssh -L 8000:localhost:8787 user@remote
     # ssh -L 8000:localhost:8787 weiz@ahrensm-ws2
-    
+
     if not is_bz2:
         files = sorted(glob(dir_root+'/*.h5'))
         chunks = File(files[0],'r')['default'].shape
@@ -50,7 +50,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
         dims = [int(float(num)) for num in dims]
         files = sorted(glob(dir_root+'/*.stack.bz2'))
         imread = dask.delayed(lambda v: load_bz2file(v, dims), pure=True)
-        lazy_data = [imread(fn) for fn in files] 
+        lazy_data = [imread(fn) for fn in files]
         sample = lazy_data[0].compute()
         data = da.stack([da.from_delayed(fn, shape=sample.shape, dtype=sample.dtype) for fn in lazy_data])
         cameraInfo = getCameraInfo(dir_root)
@@ -88,12 +88,12 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
     # apply affine transform
     if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
         print('Apply registration ---')
-        num_z = chunks[0]
         if not os.path.exists(f'{save_root}/motion_corrected_data_tmp.zarr'):
             trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
             trans_data_.to_zarr(f'{save_root}/motion_corrected_data_tmp.zarr')
             del trans_data_
-        
+            
+        num_z = chunks[0]
         # there is memory issue to load data all together for this transpose on local machine
         # a solution is to do it layer by layer
         # load data
@@ -111,13 +111,13 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
         print('Remove temporal files of registration')
         if os.path.exists(f'{save_root}/motion_corrected_data_tmp.zarr'):
             shutil.rmtree(f'{save_root}/motion_corrected_data_tmp.zarr')
-        
+    
         trans_data_t = da.stack([da.from_zarr(save_root+'/motion_corrected_data_layer_%03d.zarr'%(nz)) for nz in range(num_z)])
         trans_data_t.to_zarr(f'{save_root}/motion_corrected_data.zarr')
         for nz in range(num_z):
             if os.path.exists(f'{save_root}/motion_corrected_data_layer_%03d.zarr'%(nz)):
                 shutil.rmtree(f'{save_root}/motion_corrected_data_layer_%03d.zarr'%(nz))
-
+    
     # detrend
     if not os.path.exists(f'{save_root}/detrend_data.zarr'):
         print('Compute detrend data ---')
@@ -127,7 +127,6 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
         del Y_d
 
     fdask.terminate_workers(cluster, client)
-    time.sleep(10)
     return None
 
 
