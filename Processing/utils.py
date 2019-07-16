@@ -23,6 +23,14 @@ def pixelDenoiseImag(img, cameraNoiseMat='', cameraInfo=None):
     return median_filter(simpleDN(img, offset=offset_, gain=gain_), size=filter_win)
 
 
+def load_bz2file(file, dims):
+    import bz2
+    import numpy as np
+    data = bz2.BZ2File(file,'rb').read()
+    im = np.frombuffer(data,dtype='int16')
+    return im.reshape(dims[-1::-1])
+
+
 def estimate_rigid3d(moving, fixed=None, affs=None):
     from fish_proc.imageRegistration.imTrans import ImAffine
     from numpy import expand_dims
@@ -157,48 +165,6 @@ def baseline_correct(block_b, block_t):
 def robust_sp_trend(mov):
     from fish_proc.denoiseLocalPCA.detrend import trend
     return trend(mov)
-
-
-def local_pca_block(block, mask, save_folder='.', block_id=None):
-    from fish_proc.denoiseLocalPCA.denoise import temporal as svd_patch
-    from numpy import expand_dims
-    import sys
-    import gc
-    gc.collect()
-
-    orig_stdout = sys.stdout
-    fname = f'{save_folder}/denoise_rlt/block_'
-    for _ in block_id:
-        fname += '_'+str(_)
-    f = open(fname+'_info.txt', 'w')
-    sys.stdout = f
-
-    if np.prod(block.shape) == 1:
-        Y_svd = block[0]
-        print('Testing data in dask', flush=True)
-    else:
-        if mask is None:
-            print('No mask is applied', flush=True)
-        else:
-            if mask.sum() == 0:
-                print('No valid pixels')
-                sys.stdout = orig_stdout
-                f.close()
-                return np.zeros(block.shape)
-            print('mask shape')
-            print(mask.shape, flush=True)
-        print('block shape')
-        print(block.shape, flush=True)
-        dx=4
-        nblocks=[8, 8]
-        Y_svd, _ = svd_patch(block-block.mean(axis=-1, keepdims=True), nblocks=nblocks, dx=dx, stim_knots=None, stim_delta=0, is_single_core=True)
-    sys.stdout = orig_stdout
-    f.close()
-    gc.collect()
-    if block.ndim == 4:
-        return expand_dims(Y_svd, 0)
-    else:
-        return Y_svd
 
 
 def fb_pca_block(block, mask_block, block_id=None):
