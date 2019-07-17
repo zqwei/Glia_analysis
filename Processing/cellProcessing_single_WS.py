@@ -18,7 +18,9 @@ def print_client_links(cluster):
     return None
 
 
-def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100, percentile=20, nsplit = (4, 4), dask_tmp=None, memory_limit=0, is_bz2=False):
+def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100,\
+                  percentile=20, nsplit = (4, 4), dask_tmp=None, memory_limit=0,\
+                  is_bz2=False, tmp_dat='/opt/data/weiz/'):
     '''
       1. pixel denoise
       2. registration -- save registration file
@@ -63,73 +65,78 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
         # pixel denoise
         denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraNoiseMat=cameraNoiseMat, cameraInfo=cameraInfo))
         denoised_data.to_zarr(f'{save_root}/denoised_data.zarr')
+        num_t = denoised_data.shape[0]
     else:
         denoised_data = da.from_zarr(f'{save_root}/denoised_data.zarr')
-        chunks = da.shape[1:]
-        print(chunks)
+        chunks = denoised_data.shape[1:]
+        num_t = denoised_data.shape[0]
 
-#     # save and compute reference image
-#     print('Compute reference image ---')
-#     if not os.path.exists(f'{save_root}/motion_fix_.h5'):
-#         med_win = len(denoised_data)//2
-#         ref_img = denoised_data[med_win-50:med_win+50].mean(axis=0).compute()
-#         save_h5(f'{save_root}/motion_fix_.h5', ref_img, dtype='float16')
+    # save and compute reference image
+    print('Compute reference image ---')
+    if not os.path.exists(f'{save_root}/motion_fix_.h5'):
+        med_win = len(denoised_data)//2
+        ref_img = denoised_data[med_win-50:med_win+50].mean(axis=0).compute()
+        save_h5(f'{save_root}/motion_fix_.h5', ref_img, dtype='float16')
 
-#     print('--- Done computing reference image')
+    print('--- Done computing reference image')
 
-#     # compute affine transform
-#     print('Registration to reference image ---')
-#     if not os.path.exists(f'{save_root}/trans_affs.npy'):
-#         ref_img = File(f'{save_root}/motion_fix_.h5', 'r')['default'].value
-#         ref_img = ref_img.max(axis=0, keepdims=True)
-#         trans_affine = denoised_data.map_blocks(lambda x: estimate_rigid2d(x, fixed=ref_img), dtype='float32', drop_axis=(3), chunks=(1,4,4)).compute()
-#         np.save(f'{save_root}/trans_affs.npy', trans_affine)
-#         trans_affine_ = da.from_array(trans_affine, chunks=(1,4,4))
-#     else:
-#         trans_affine_ = np.load(f'{save_root}/trans_affs.npy')
-#         trans_affine_ = da.from_array(trans_affine_, chunks=(1,4,4))
-#     print('--- Done registration reference image')
+    # compute affine transform
+    print('Registration to reference image ---')
+    if not os.path.exists(f'{save_root}/trans_affs.npy'):
+        ref_img = File(f'{save_root}/motion_fix_.h5', 'r')['default'].value
+        ref_img = ref_img.max(axis=0, keepdims=True)
+        trans_affine = denoised_data.map_blocks(lambda x: estimate_rigid2d(x, fixed=ref_img), dtype='float32', drop_axis=(3), chunks=(1,4,4)).compute()
+        np.save(f'{save_root}/trans_affs.npy', trans_affine)
+        trans_affine_ = da.from_array(trans_affine, chunks=(1,4,4))
+    else:
+        trans_affine_ = np.load(f'{save_root}/trans_affs.npy')
+        trans_affine_ = da.from_array(trans_affine_, chunks=(1,4,4))
+    print('--- Done registration reference image')
 
-#     # apply affine transform
-#     if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
-#         print('Apply registration ---')
-#         if not os.path.exists(f'{save_root}/motion_corrected_data_tmp.zarr'):
-#             trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
-#             trans_data_.to_zarr(f'{save_root}/motion_corrected_data_tmp.zarr')
-#             del trans_data_
+    # apply affine transform
+    if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
+        print('Apply registration ---')
+        if not os.path.exists(f'{save_root}/motion_corrected_data_tmp.zarr'):
+            trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
+            trans_data_.to_zarr(f'{save_root}/motion_corrected_data_tmp.zarr')
+            del trans_data_
             
-#         num_z = chunks[0]
-#         # there is memory issue to load data all together for this transpose on local machine
-#         # a solution is to do it layer by layer
-#         # load data
-#         trans_data_ = da.from_zarr(f'{save_root}/motion_corrected_data_tmp.zarr')
-#         # get z info
-#         print(f'Processing total {num_z} layers.......')
-#         for nz in range(num_z):
-#             if not os.path.exists(save_root+'/motion_corrected_data_layer_%03d.zarr'%(nz)):
-#                 print('starting to rechunk layer %03d'%(nz))
-#                 trans_data_t_z = trans_data_[:, nz].rechunk((-1, chunks[1]//nsplit[0], chunks[2]//nsplit[1])).transpose((1, 2, 0))
-#                 trans_data_t_z.to_zarr(save_root+'/motion_corrected_data_layer_%03d.zarr'%(nz))
-#                 del trans_data_t_z
-#                 gc.collect()
-#                 print('finishing rechunking layer %03d'%(nz))
-#         print('Remove temporal files of registration')
-#         if os.path.exists(f'{save_root}/motion_corrected_data_tmp.zarr'):
-#             shutil.rmtree(f'{save_root}/motion_corrected_data_tmp.zarr')
+        # fix memory issue to load data all together for transpose on local machine
+        # load data
+        trans_data_ = da.from_zarr(f'{save_root}/motion_corrected_data_tmp.zarr')
+        # swap axes
+        num_t_chunks = 10
+        splits_ = np.array_split(np.arange(num_t).astype('int'), num_t_chunks)
+        print(f'Processing total {num_t_chunks} chunks in time.......')
+        for nz, n_split in enumerate(splits_):
+            if not os.path.exists(save_root+'/motion_corrected_data_layer_%03d.zarr'%(nz)):
+                print('starting to rechunk layer %03d'%(nz))
+                trans_data_t_z = trans_data_[n_split].rechunk((-1, 1, chunks[1]//nsplit[0], chunks[2]//nsplit[1])).transpose((1, 2, 3, 0))
+                trans_data_t_z.to_zarr(save_root+'/motion_corrected_data_chunks_%03d.zarr'%(nz))
+                del trans_data_t_z
+                gc.collect()
+                print('finishing rechunking time chunk -- %03d of %03d'%(nz, num_t_chunks))
+        
+        print('Remove temporal files of registration')      
+        if os.path.exists(f'{save_root}/motion_corrected_data_tmp.zarr'):
+            shutil.rmtree(f'{save_root}/motion_corrected_data_tmp.zarr')
+        if os.path.exists(f'{save_root}/denoised_data.zarr'):
+            shutil.rmtree(f'{save_root}/denoised_data.zarr')
+
+        trans_data_t = da.concatenate([da.from_zarr(save_root+'/motion_corrected_data_chunks_%03d.zarr'%(nz)) for nz in range(num_t_chunks)], axis=-1)
+        trans_data_t = trans_data_t.rechunk((1, chunks[1]//nsplit[0], chunks[2]//nsplit[1], -1))
+        trans_data_t.to_zarr(f'{save_root}/motion_corrected_data.zarr')
+        for nz in range(num_t_chunks):
+            if os.path.exists(f'{save_root}/motion_corrected_data_chunks_%03d.zarr'%(nz)):
+                shutil.rmtree(f'{save_root}/motion_corrected_data_chunks_%03d.zarr'%(nz))
     
-#         trans_data_t = da.stack([da.from_zarr(save_root+'/motion_corrected_data_layer_%03d.zarr'%(nz)) for nz in range(num_z)])
-#         trans_data_t.to_zarr(f'{save_root}/motion_corrected_data.zarr')
-#         for nz in range(num_z):
-#             if os.path.exists(f'{save_root}/motion_corrected_data_layer_%03d.zarr'%(nz)):
-#                 shutil.rmtree(f'{save_root}/motion_corrected_data_layer_%03d.zarr'%(nz))
-    
-#     # detrend
-#     if not os.path.exists(f'{save_root}/detrend_data.zarr'):
-#         print('Compute detrend data ---')
-#         trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
-#         Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
-#         Y_d.to_zarr(f'{save_root}/detrend_data.zarr')
-#         del Y_d
+    # detrend
+    if not os.path.exists(f'{save_root}/detrend_data.zarr'):
+        print('Compute detrend data ---')
+        trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+        Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
+        Y_d.to_zarr(f'{save_root}/detrend_data.zarr')
+        del Y_d
 
     fdask.terminate_workers(cluster, client)
     return None
