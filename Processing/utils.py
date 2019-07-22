@@ -114,7 +114,7 @@ def save_h5_rescale(filename, data, reset_max_int=65535):
         f.close()
 
 
-def baseline(data, window=100, percentile=15, downsample=1, axis=-1):
+def baseline(data, window=100, percentile=15, downsample=10, axis=-1):
     """
     Get the baseline of a numpy array using a windowed percentile filter with optional downsampling
     data : Numpy array
@@ -169,7 +169,8 @@ def robust_sp_trend(mov):
 
 def fb_pca_block(block, mask_block, block_id=None):
     # using fb pca instead of local pca from fish
-    from fbpca import pca
+    # from fbpca import pca
+    from sklearn.utils.extmath import randomized_svd
     from numpy import expand_dims
     if mask_block.sum()==0:
         return np.zeros(block.shape)
@@ -178,7 +179,8 @@ def fb_pca_block(block, mask_block, block_id=None):
     dimsM = M.shape
     M = M.reshape((np.prod(dimsM[:-1]),dimsM[-1]),order='F')
     k = min(min(M.shape)//4, 300)
-    [U, S, Va] = pca(M.T, k=k, n_iter=20, raw=True)
+    # [U, S, Va] = pca(M.T, k=k, n_iter=20, raw=True)
+    [U, S, Va] = randomized_svd(M.T, k, n_iter=10, power_iteration_normalizer='QR')
     M_pca = U.dot(np.diag(S).dot(Va))
     M_pca = M_pca.T.reshape(dimsM, order='F')
     return expand_dims(M_pca, 0)
@@ -216,9 +218,10 @@ def mask_blocks(block, mask=None):
     return _
 
 
-def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None):
+def demix_blocks(block, mask_block, save_folder='.', is_skip=True, params=None, block_id=None):
     # this uses old parameter set up
     import pickle
+    from pathlib import Path
     import sys
     from fish_proc.demix import superpixel_analysis as sup
     from fish_proc.utils.snr import local_correlations_fft
@@ -232,24 +235,46 @@ def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None
     if os.path.exists(fname+'_rlt.pkl') and is_skip:
         return np.zeros([1]*4)
     if mask_block.sum() ==0:
+        Path(fname+'_empty_rlt.tmp').touch()
         return np.zeros([1]*4)
     M = block.squeeze().copy()
     M[~mask_block.squeeze()] = 0
     Cblock = local_correlations_fft(M, is_mp=False)
     if (Cblock>0).sum()==0:
+        Path(fname+'_empty_rlt.tmp').touch()
         return np.zeros([1]*4)
+    
+    # get parameters
+    if params is None:
+        cut_off_point = np.percentile(Cblock[:], [99, 95, 80, 50])
+        length_cut=[60, 40, 40, 40]
+        max_allow_neuron_size=0.15
+        patch_size=[10, 10]
+        max_iter=50
+        max_iter_fin=90
+        update_after=40
+    else:
+        if params['cut_perc']:
+            cut_off_point = np.percentile(Cblock[:], params['cut_off_point'])
+        else:
+            cut_off_point = params['cut_off_point']
+        length_cut=params['length_cut']
+        max_allow_neuron_size=params['max_allow_neuron_size']
+        patch_size=params['patch_size']
+        max_iter=params['max_iter']
+        max_iter_fin=params['max_iter_fin']
+        update_after=params['update_after']
+    pass_num = len(cut_off_point)
+    pass_num_max = len(cut_off_point)
+    th = [1] * pass_num_max
+    residual_cut = [0.6] * pass_num_max
     # demix
-    cut_off_point = np.percentile(Cblock[:], [99, 95, 80, 40])#[0.95, 0.9, 0.85, 0.70]
-    pass_num = 4
-    pass_num_max = 4
     while not is_demix and pass_num>=0:
         try:
-            rlt_= sup.demix_whole_data(M, cut_off_point[pass_num_max-pass_num:], length_cut=[20, 20, 20, 20],
-                                       th=[1,1,0,0], pass_num=pass_num, residual_cut = [0.6,0.6,0.6,0.6],
-                                       corr_th_fix=0.3, max_allow_neuron_size=0.15, merge_corr_thr=0.60,
-                                       merge_overlap_thr=0.6, num_plane=1, patch_size=[50, 50], plot_en=False,
-                                       TF=False, fudge_factor=1, text=False, bg=False, max_iter=50,
-                                       max_iter_fin=90, update_after=40)
+            rlt_= sup.demix_whole_data(M, cut_off_point[pass_num_max-pass_num:], length_cut=length_cut[pass_num_max-pass_num:],
+                                       th=th, pass_num=pass_num, residual_cut=residual_cut, corr_th_fix=0.3, max_allow_neuron_size=max_allow_neuron_size,
+                                       merge_overlap_thr=0.6, patch_size=patch_size, text=False, bg=False, max_iter=max_iter,
+                                       max_iter_fin=max_iter_fin, update_after=update_after)
             is_demix = True
         except:
             print(f'fail at pass_num {pass_num}', flush=True)
@@ -259,6 +284,7 @@ def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None
         with open(fname+'_rlt.pkl', 'wb') as f:
             pickle.dump(rlt_, f)
     except:
+        Path(fname+'_empty_rlt.tmp').touch()
         pass
     return np.zeros([1]*4)
 

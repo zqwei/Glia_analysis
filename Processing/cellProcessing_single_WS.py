@@ -18,21 +18,11 @@ def print_client_links(cluster):
     return None
 
 
-def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100,\
-                  percentile=20, nsplit = (4, 4), dask_tmp=None, memory_limit=0,\
-                  is_bz2=False, tmp_dat='/opt/data/weiz/'):
-    '''
-      1. pixel denoise
-      2. registration -- save registration file
-      3. detrend using percentile baseline
-      4. local pca denoise
-    '''
-
+def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (4, 4),\
+                  dask_tmp=None, memory_limit=0, is_bz2=False):
     # set worker
     cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
     print_client_links(cluster)
-    # status forwarding ssh -L 8000:localhost:8787 user@remote
-    # ssh -L 8000:localhost:8787 weiz@ahrensm-ws2
     
     if not os.path.exists(f'{save_root}/denoised_data.zarr'):
         if not is_bz2:
@@ -100,6 +90,8 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
             trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
             trans_data_.to_zarr(f'{save_root}/motion_corrected_data_tmp.zarr')
             del trans_data_
+            if os.path.exists(f'{save_root}/denoised_data.zarr'):
+                shutil.rmtree(f'{save_root}/denoised_data.zarr')
             
         # fix memory issue to load data all together for transpose on local machine
         # load data
@@ -120,8 +112,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
         print('Remove temporal files of registration')      
         if os.path.exists(f'{save_root}/motion_corrected_data_tmp.zarr'):
             shutil.rmtree(f'{save_root}/motion_corrected_data_tmp.zarr')
-        if os.path.exists(f'{save_root}/denoised_data.zarr'):
-            shutil.rmtree(f'{save_root}/denoised_data.zarr')
+
 
         trans_data_t = da.concatenate([da.from_zarr(save_root+'/motion_corrected_data_chunks_%03d.zarr'%(nz)) for nz in range(num_t_chunks)], axis=-1)
         trans_data_t = trans_data_t.rechunk((1, chunks[1]//nsplit[0], chunks[2]//nsplit[1], -1))
@@ -129,16 +120,40 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, window=100
         for nz in range(num_t_chunks):
             if os.path.exists(f'{save_root}/motion_corrected_data_chunks_%03d.zarr'%(nz)):
                 shutil.rmtree(f'{save_root}/motion_corrected_data_chunks_%03d.zarr'%(nz))
-    
-    # detrend
+    fdask.terminate_workers(cluster, client)
+    return None
+
+
+def detrend_data(dir_root, save_root, window=100, percentile=20, nsplit = (4, 4), dask_tmp=None, memory_limit=0):
     if not os.path.exists(f'{save_root}/detrend_data.zarr'):
+        cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
+        print_client_links(cluster)
         print('Compute detrend data ---')
         trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
         Y_d = trans_data_t.map_blocks(lambda v: v - baseline(v, window=window, percentile=percentile), dtype='float32')
         Y_d.to_zarr(f'{save_root}/detrend_data.zarr')
         del Y_d
+        fdask.terminate_workers(cluster, client)
+    return None
 
-    fdask.terminate_workers(cluster, client)
+
+def default_mask(dir_root, save_root, dask_tmp=None, memory_limit=0):
+    if not os.path.exists(f'{save_root}/Y_max.zarr'):
+        cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
+        print_client_links(cluster)
+        print('Compute default mask ---')
+        Y = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+        Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+        Y_b = Y - Y_d
+        Y_b_max_mask = Y_b.max(axis=-1, keepdims=True)>2
+        Y_b_min_mask = Y_b.min(axis=-1, keepdims=True)>1
+        mask = Y_b_max_mask & Y_b_min_mask
+        mask.to_zarr(f'{save_root}/mask_map.zarr', overwrite=True)
+        Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+        Y_d_max = Y_d.max(axis=-1, keepdims=True)
+        print('Save average data ---')
+        Y_d_max.to_zarr(f'{save_root}/Y_max.zarr', overwrite=True)
+        fdask.terminate_workers(cluster, client)
     return None
 
 
@@ -157,7 +172,7 @@ def local_pca_on_mask(save_root, is_dff=False, dask_tmp=None, memory_limit=0):
     return None
 
 
-def demix_cells(save_root, dt, is_skip=True, dask_tmp=None, memory_limit=0):
+def demix_cells(save_root, dt, params=None, is_skip=True, dask_tmp=None, memory_limit=0):
     '''
       1. local pca denoise
       2. cell segmentation
@@ -169,7 +184,7 @@ def demix_cells(save_root, dt, is_skip=True, dask_tmp=None, memory_limit=0):
     mask = da.from_zarr(f'{save_root}/mask_map.zarr')
     if not os.path.exists(f'{save_root}/demix_rlt/'):
         os.mkdir(f'{save_root}/demix_rlt/')
-    da.map_blocks(demix_blocks, Y_svd, mask, chunks=(1, 1, 1, 1), dtype='int8', save_folder=save_root, is_skip=is_skip).compute()
+    da.map_blocks(demix_blocks, Y_svd, mask, chunks=(1, 1, 1, 1), dtype='int8', save_folder=save_root, is_skip=is_skip, params=params).compute()
     fdask.terminate_workers(cluster, client)
     time.sleep(10)
     return None
@@ -209,9 +224,9 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
         plt.show()
         if plot_mask:
             plt.imshow(mask_, cmap='gray', alpha=0.5)
-        plt.title('Components')
-        plt.axis('off')
-        plt.show()
+            plt.title('Components')
+            plt.axis('off')
+            plt.show()
     except:
         print('No components')
 #     plt.imshow(Y_d_ave_, vmax=v_max)
