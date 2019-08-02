@@ -206,22 +206,28 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
     _, x_, y_, _ = Y_d_ave.chunksize
     try:
         A_ = load_A_matrix(save_root=save_root, block_id=block_id, min_size=0)
-        print(A_.shape[-1])
-        plt.figure(figsize=(8, 8))
+        A_[A_<A_.max()*0.2] = 0
         for n in range(A_.shape[-1]):
             n_max = A_[:, n].max()
             A_[A_[:,n]<n_max*0, n] = 0
         A_comp = np.zeros(A_.shape[0])
         A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + 1
         A_comp[A_comp>0] = A_comp[A_comp>0]%20+1
+        plt.figure(figsize=(8, 8))
         plt.imshow(Y_d_ave_, vmax=v_max, cmap='gray')
         plt.imshow(A_comp.reshape(y_, x_).T, cmap=plt.cm.nipy_spectral_r, alpha=0.4)
-#         A_comp = A_.sum(axis=-1)
-#         plt.imshow(A_comp.reshape(y_, x_).T)
+        plt.title('Components')
+        plt.axis('off')
+        plt.show()
+        plt.figure(figsize=(8, 8))
+        plt.title('Weights')
+        A_comp = A_.sum(axis=-1)
+        plt.imshow(A_comp.reshape(y_, x_).T)
+        plt.axis('off')
+        plt.show()
 #         for n in range(A_.shape[-1]):
 #             plt.imshow(A_[:, n].reshape(y_, x_).T)
 #             plt.show()
-        plt.show()
         if plot_mask:
             plt.imshow(mask_, cmap='gray', alpha=0.5)
             plt.title('Components')
@@ -229,10 +235,6 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
             plt.show()
     except:
         print('No components')
-#     plt.imshow(Y_d_ave_, vmax=v_max)
-#     plt.title('Max Intensity')
-#     plt.axis('off')
-#     plt.show()
     if plot_global:
         area_mask = np.zeros((xdim, ydim)).astype('bool')
         area_mask[block_id[1]*x_:block_id[1]*x_+x_, block_id[2]*y_:block_id[2]*y_+y_]=True
@@ -270,8 +272,8 @@ def check_demix_cells_layer(save_root, nlayer, nsplit = (10, 16)):
 
     plt.figure(figsize=(8, 8))
     A_mat[A_mat>0] = A_mat[A_mat>0]%60+1
-    plt.imshow(Y_d_ave_, vmax=A_mat.max()*1.0)
-    plt.imshow(A_mat, cmap=plt.cm.nipy_spectral_r, alpha=0.3)
+#     plt.imshow(Y_d_ave_, vmax=A_mat.max()*0.90, cmap=plt.cm.gray)
+    plt.imshow(A_mat, cmap=plt.cm.nipy_spectral_r, alpha=1.0)
     plt.title('Components')
     plt.axis('off')
     plt.show()
