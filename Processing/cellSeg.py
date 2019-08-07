@@ -63,11 +63,21 @@ print('Demix')
 dt = 3
 is_skip = False
 params = {'cut_perc': True, 
-          'cut_off_point':[99, 95, 80, 50], 
+          'cut_off_point':[95, 80, 60, 50], 
           'length_cut':[60, 40, 40, 40], 
-          'max_allow_neuron_size':0.15, 
+          'max_allow_neuron_size':0.3, 
           'patch_size':[10, 10],
           'max_iter':50,
           'max_iter_fin':90,
           'update_after':40}
+
+# params_v1 = {'cut_perc': True, 
+#           'cut_off_point':[99, 95, 80, 50], 
+#           'length_cut':[60, 40, 40, 40], 
+#           'max_allow_neuron_size':0.15, 
+#           'patch_size':[10, 10],
+#           'max_iter':50,
+#           'max_iter_fin':90,
+#           'update_after':40}
+
 demix_cells(save_root, dt, params=params, is_skip=is_skip, dask_tmp=dask_tmp, memory_limit=memory_limit)
