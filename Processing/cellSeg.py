@@ -63,13 +63,22 @@ print('Demix')
 dt = 3
 is_skip = False
 params = {'cut_perc': True, 
-          'cut_off_point':[95, 80, 60, 50], 
+          'cut_off_point':[95, 80, 60, 30], 
           'length_cut':[60, 40, 40, 40], 
-          'max_allow_neuron_size':0.3, 
+          'max_allow_neuron_size':0.6, 
           'patch_size':[10, 10],
           'max_iter':50,
           'max_iter_fin':90,
           'update_after':40}
+
+# params_v2 = {'cut_perc': True, 
+#           'cut_off_point':[95, 80, 60, 50], 
+#           'length_cut':[60, 40, 40, 40], 
+#           'max_allow_neuron_size':0.3, 
+#           'patch_size':[10, 10],
+#           'max_iter':50,
+#           'max_iter_fin':90,
+#           'update_after':40}
 
 # params_v1 = {'cut_perc': True, 
 #           'cut_off_point':[99, 95, 80, 50], 
