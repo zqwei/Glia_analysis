@@ -289,16 +289,81 @@ def demix_blocks(block, mask_block, save_folder='.', is_skip=True, params=None, 
     return np.zeros([1]*4)
 
 
-def demix_file_name_block(save_root='.', block_id=None):
-    fname = f'{save_root}/demix_rlt/period_Y_demix_block_'
+def sup_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None):
+    # this uses old parameter set up
+    import pickle
+    from pathlib import Path
+    import sys
+    from fish_proc.demix import superpixel_analysis as sup
+    from fish_proc.utils.snr import local_correlations_fft
+    is_demix = False
+    
+    # set fname for blocks
+    fname = 'period_Y_demix_block_'
+    for _ in block_id:
+        fname += '_'+str(_)
+    # set no processing conditions
+    sup_fname = f'{save_folder}/sup_demix_rlt/'+fname
+    demix_fname = f'{save_folder}/demix_rlt/'+fname
+    # file exist -- skip
+    if os.path.exists(sup_fname+'_rlt.npz') and is_skip:
+        return np.zeros([1]*4)
+    # no pixels -- skip
+    if mask_block.sum() ==0:
+        Path(sup_fname+'_empty_rlt.tmp').touch()
+        return np.zeros([1]*4)
+    M = block.squeeze().copy()
+    M[~mask_block.squeeze()] = 0
+    Cblock = local_correlations_fft(M, is_mp=False)
+    # no corrlated pixel -- skip
+    if (Cblock>0).sum()==0:
+        Path(sup_fname+'_empty_rlt.tmp').touch()
+        return np.zeros([1]*4)
+    
+    cut_off_point = np.percentile(Cblock[:], 10) # set 1% correlation as threshould
+    cut_off_point = max(cut_off_point, 0.01) # force it larger than 0.01
+    _, x_, y_, _ = block.shape
+    
+    # load demixed A matrix
+    try:
+        A_ = load_A_matrix(save_root=save_folder, ext='', block_id=block_id, min_size=0)
+    except:
+        A_ = np.zeros((x_*y_, 1))
+    if A_ is None:
+        A_ = np.zeros((x_*y_, 1))
+    # reset small weights to zeros
+    for n in range(A_.shape[-1]):
+        n_max = A_[:, n].max()
+        A_[A_[:,n]<n_max*0.2, n] = 0
+    # valid_pixels
+    valid_pixels = A_.sum(-1)>0
+    valid_pixels = valid_pixels.reshape(x_, y_, order='F')
+    M[valid_pixels] = 0
+    
+    if (M.sum(-1)>0).sum()==0:
+        np.savez(sup_fname+'_rlt.npz', A=A_, A_ext=np.zeros(x_*y_))
+    try:
+        rlt_= sup.demix_whole_data(M, [cut_off_point], length_cut=[10],th=[0], pass_num=1, residual_cut=[0.6], 
+                                   corr_th_fix=0.3, max_allow_neuron_size=.99, merge_overlap_thr=0.6, 
+                                   patch_size=[10, 10], text=False, bg=False, max_iter=0,max_iter_fin=0, update_after=0)
+    except Exception as e:
+        print(e)
+        print(block_id)
+    A_ext=rlt_['fin_rlt']['a']
+    np.savez(sup_fname+'_rlt.npz', A=A_, A_ext=A_ext)
+    return np.zeros([1]*4)
+
+
+def demix_file_name_block(save_root='.', ext='', block_id=None):
+    fname = f'{save_root}/demix_rlt{ext}/period_Y_demix_block_'
     for _ in block_id:
         fname += '_'+str(_)
     return fname+'_rlt.pkl'
 
 
-def load_A_matrix(save_root='.', block_id=None, min_size=40):
+def load_A_matrix(save_root='.', ext='', block_id=None, min_size=40):
     import pickle
-    fname = demix_file_name_block(save_root=save_root, block_id=block_id)
+    fname = demix_file_name_block(save_root=save_root, ext=ext, block_id=block_id)
     with open(fname, 'rb') as f:
         try:
             rlt_ = pickle.load(f)

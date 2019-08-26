@@ -190,6 +190,24 @@ def demix_cells(save_root, dt, params=None, is_skip=True, dask_tmp=None, memory_
     return None
 
 
+def sup_cells(save_root, dt, is_skip=True, dask_tmp=None, memory_limit=0):
+    '''
+      1. local pca denoise
+      2. cell segmentation
+    '''
+    cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
+    print_client_links(cluster)
+    Y_svd = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
+    Y_svd = Y_svd[:, :, :, ::dt]
+    mask = da.from_zarr(f'{save_root}/mask_map.zarr')
+    if not os.path.exists(f'{save_root}/sup_demix_rlt/'):
+        os.mkdir(f'{save_root}/sup_demix_rlt/')
+    da.map_blocks(sup_blocks, Y_svd, mask, chunks=(1, 1, 1, 1), dtype='int8', save_folder=save_root, is_skip=is_skip).compute()
+    fdask.terminate_workers(cluster, client)
+    time.sleep(10)
+    return None
+
+
 def check_fail_block(save_root, dt=0):
     file = glob(f'{save_root}/masked_local_pca_data.zarr/*.partial')
     print(file)
@@ -206,7 +224,7 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
     _, x_, y_, _ = Y_d_ave.chunksize
     try:
         A_ = load_A_matrix(save_root=save_root, block_id=block_id, min_size=0)
-        A_[A_<A_.max()*0.2] = 0
+        A_[A_<A_.max()*0] = 0
         for n in range(A_.shape[-1]):
             n_max = A_[:, n].max()
             A_[A_[:,n]<n_max*0, n] = 0
@@ -225,9 +243,6 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
         plt.imshow(A_comp.reshape(y_, x_).T)
         plt.axis('off')
         plt.show()
-#         for n in range(A_.shape[-1]):
-#             plt.imshow(A_[:, n].reshape(y_, x_).T)
-#             plt.show()
         if plot_mask:
             plt.imshow(mask_, cmap='gray', alpha=0.5)
             plt.title('Components')
@@ -258,31 +273,23 @@ def check_demix_cells_layer(save_root, nlayer, nsplit = (10, 16)):
     for nx in range(nsplit[0]):
         for ny in range(nsplit[1]):
             try:
-                A_ = load_A_matrix(save_root=save_root, block_id=(nlayer, nx, ny, 0), min_size=0)
+                A_ = load_A_matrix(save_root=save_root, ext='_v1', block_id=(nlayer, nx, ny, 0), min_size=0)
                 for n in range(A_.shape[-1]):
                     n_max = A_[:, n].max()
-                    A_[A_[:,n]<n_max*0, n] = 0
+                    A_[A_[:,n]<n_max*0.2, n] = 0
                 A_comp = np.zeros(A_.shape[0])
                 A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + n_comp
                 A_mat[x_*nx:x_*(nx+1), y_*ny:y_*(ny+1)] =A_comp.reshape(y_, x_).T
-#                 A_mat[x_*nx:x_*(nx+1), y_*ny:y_*(ny+1)] = A_.sum(axis=-1).reshape(y_, x_).T
                 n_comp = A_mat.max()+1
             except:
                 pass
 
     plt.figure(figsize=(8, 8))
     A_mat[A_mat>0] = A_mat[A_mat>0]%60+1
-#     plt.imshow(Y_d_ave_, vmax=A_mat.max()*0.90, cmap=plt.cm.gray)
     plt.imshow(A_mat, cmap=plt.cm.nipy_spectral_r, alpha=1.0)
     plt.title('Components')
     plt.axis('off')
     plt.show()
-
-#     plt.figure(figsize=(8, 8))
-#     plt.imshow(Y_d_ave_, vmax=v_max)
-#     plt.title('Max Intensity')
-#     plt.axis('off')
-#     plt.show()
     return None
 
 
@@ -302,11 +309,10 @@ def check_demix_cells_whole_brain(save_root, nsplit = (10, 16)):
                     A_ = load_A_matrix(save_root=save_root, block_id=(nlayer, nx, ny, 0), min_size=0)
                     for n in range(A_.shape[-1]):
                         n_max = A_[:, n].max()
-                        A_[A_[:,n]<n_max*0, n] = 0
+                        A_[A_[:,n]<n_max*0.2, n] = 0
                     A_comp = np.zeros(A_.shape[0])
                     A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + n_comp
                     A_mat[x_*nx:x_*(nx+1), y_*ny:y_*(ny+1)] =A_comp.reshape(y_, x_).T
-    #                 A_mat[x_*nx:x_*(nx+1), y_*ny:y_*(ny+1)] = A_.sum(axis=-1).reshape(y_, x_).T
                     n_comp = A_mat.max()+1
                 except:
                     pass
@@ -314,7 +320,6 @@ def check_demix_cells_whole_brain(save_root, nsplit = (10, 16)):
     plt.figure(figsize=(8, 8))
     A_mat[A_mat>0] = A_mat[A_mat>0]%60+1
     plt.imshow(A_mat, cmap=plt.cm.nipy_spectral_r)
-#     plt.imshow(A_mat, vmax=A_mat.max()*0.6)
     plt.title('Components')
     plt.axis('off')
     plt.show()
