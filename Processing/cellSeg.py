@@ -8,8 +8,12 @@ import dask.array as da
 import numpy as np
 import matplotlib.pyplot as plt
 
-dir_root = '/nrs/ahrens/jing/giving_up/20190430/fish01/6dpf_HuC-GCaMP7ff-GFAP-RGECO_GU-slow-fwd_fish01_exp01_20190430_174349/im'
-save_root = '/nrs/ahrens/Ziqiang/Jing_Glia_project/Processed_data/20190430/fish01/6dpf_HuC-GCaMP7ff-GFAP-RGECO_GU-slow-fwd_fish01_exp01_20190430_174349/'
+# dir_root = '/nrs/ahrens/jing/giving_up/20190430/fish01/6dpf_HuC-GCaMP7ff-GFAP-RGECO_GU-slow-fwd_fish01_exp01_20190430_174349/im'
+# save_root = '/nrs/ahrens/Ziqiang/Jing_Glia_project/Processed_data/20190430/fish01/6dpf_HuC-GCaMP7ff-GFAP-RGECO_GU-slow-fwd_fish01_exp01_20190430_174349/'
+
+dir_root = '/nrs/ahrens/jing/giving_up/20190728/fish00/huc-gcamp7ff_HGLG-slow-fwd_fish00_exp01_20190728_193630'
+save_root = '/nrs/ahrens/Ziqiang/Jing_Glia_project/Processed_data/20190728/fish00/huc-gcamp7ff_HGLG-slow-fwd_fish00_exp01_20190728_193630/'
+
 dask_tmp = '/opt/data/weiz/dask-worker-space'
 memory_limit = 0 # unlimited
 
@@ -61,32 +65,16 @@ if not os.path.exists(f'{save_root}/masked_local_pca_data.zarr'):
 print('========================')
 print('Demix')
 dt = 3
-is_skip = False
+is_skip = True
 params = {'cut_perc': True, 
-          'cut_off_point':[95, 80, 60, 30], 
-          'length_cut':[60, 40, 40, 40], 
-          'max_allow_neuron_size':0.6, 
+          'cut_off_point':[95, 80, 60, 20], 
+          'length_cut':[20, 20, 40, 40], 
+          'max_allow_neuron_size':0.9, 
           'patch_size':[10, 10],
           'max_iter':50,
           'max_iter_fin':90,
           'update_after':40}
 
-# params_v2 = {'cut_perc': True, 
-#           'cut_off_point':[95, 80, 60, 50], 
-#           'length_cut':[60, 40, 40, 40], 
-#           'max_allow_neuron_size':0.3, 
-#           'patch_size':[10, 10],
-#           'max_iter':50,
-#           'max_iter_fin':90,
-#           'update_after':40}
-
-# params_v1 = {'cut_perc': True, 
-#           'cut_off_point':[99, 95, 80, 50], 
-#           'length_cut':[60, 40, 40, 40], 
-#           'max_allow_neuron_size':0.15, 
-#           'patch_size':[10, 10],
-#           'max_iter':50,
-#           'max_iter_fin':90,
-#           'update_after':40}
-
 demix_cells(save_root, dt, params=params, is_skip=is_skip, dask_tmp=dask_tmp, memory_limit=memory_limit)
+
+sup_cells(save_root, dt, params=params, is_skip=is_skip, dask_tmp=dask_tmp, memory_limit=memory_limit)
