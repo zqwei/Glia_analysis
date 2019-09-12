@@ -332,27 +332,27 @@ def check_demix_cells_whole_brain(save_root, nsplit = (10, 16)):
     return None
 
 
-def compute_cell_dff_pixels(save_root, numCores=20):
-    '''
-      1. local pca denoise (\delta F signal)
-      2. baseline
-      3. Cell weight matrix apply to denoise and baseline
-      4. dff
-    '''
-    # set worker
-    cluster, client = fdask.setup_workers(numCores)
-    print_client_links(cluster)
-    trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
-    Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
-    baseline_t = da.map_blocks(baseline_from_Yd, trans_data_t, Y_d, dtype='float32')
-    dff = Y_d/baseline_t
-    dff.to_zarr(f'{save_root}/pixel_dff.zarr', overwrite=True)
-    cluster.stop_all_jobs()
-    cluster.close()
-    return None
+# def compute_cell_dff_pixels(save_root, numCores=20):
+#     '''
+#       1. local pca denoise (\delta F signal)
+#       2. baseline
+#       3. Cell weight matrix apply to denoise and baseline
+#       4. dff
+#     '''
+#     # set worker
+#     cluster, client = fdask.setup_workers(numCores)
+#     print_client_links(cluster)
+#     trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+#     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+#     baseline_t = da.map_blocks(baseline_from_Yd, trans_data_t, Y_d, dtype='float32')
+#     dff = Y_d/baseline_t
+#     dff.to_zarr(f'{save_root}/pixel_dff.zarr', overwrite=True)
+#     cluster.stop_all_jobs()
+#     cluster.close()
+#     return None
 
 
-def compute_cell_dff_raw(save_root, numCores=20):
+def compute_cell_dff_raw(save_root, dask_tmp=None, memory_limit=0):
     '''
       1. local pca denoise (\delta F signal)
       2. baseline
@@ -362,38 +362,37 @@ def compute_cell_dff_raw(save_root, numCores=20):
     # set worker
     if not os.path.exists(f'{save_root}/cell_raw_dff'):
         os.mkdir(f'{save_root}/cell_raw_dff')
-    cluster, client = fdask.setup_workers(numCores)
+    cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
     print_client_links(cluster)
     trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
     baseline_t = da.map_blocks(baseline_from_Yd, trans_data_t, Y_d, dtype='float32')
     if not os.path.exists(f'{save_root}/cell_raw_dff'):
         os.makedirs(f'{save_root}/cell_raw_dff')
-    da.map_blocks(compute_cell_raw_dff, baseline_t, Y_d, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root).compute()#.compute(scheduler='single-threaded')
-    cluster.stop_all_jobs()
-    cluster.close()
+    da.map_blocks(compute_cell_raw_dff, baseline_t, Y_d, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, ext='').compute()
+    fdask.terminate_workers(cluster, client)
     return None
 
 
-def compute_cell_dff_NMF(save_root, numCores=20, dt=3):
-    '''
-      1. local pca denoise (\delta F signal)
-      2. baseline
-      3. Cell weight matrix apply to denoise and baseline
-      4. dff
-    '''
-    # set worker
-    if not os.path.exists(f'{save_root}/cell_nmf_dff'):
-        os.mkdir(f'{save_root}/cell_nmf_dff')
-    cluster, client = fdask.setup_workers(numCores)
-    print_client_links(cluster)
-    trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
-    Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
-    baseline_t = da.map_blocks(baseline_from_Yd, trans_data_t, Y_d, dtype='float32')
-    pca_data = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
-    if not os.path.exists(f'{save_root}/cell_nmf_dff'):
-        os.makedirs(f'{save_root}/cell_nmf_dff')
-    da.map_blocks(compute_cell_denoise_dff, baseline_t, pca_data, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, dt=dt).compute()
-    cluster.stop_all_jobs()
-    cluster.close()
-    return None
+# def compute_cell_dff_NMF(save_root, numCores=20, dt=3):
+#     '''
+#       1. local pca denoise (\delta F signal)
+#       2. baseline
+#       3. Cell weight matrix apply to denoise and baseline
+#       4. dff
+#     '''
+#     # set worker
+#     if not os.path.exists(f'{save_root}/cell_nmf_dff'):
+#         os.mkdir(f'{save_root}/cell_nmf_dff')
+#     cluster, client = fdask.setup_workers(numCores)
+#     print_client_links(cluster)
+#     trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+#     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+#     baseline_t = da.map_blocks(baseline_from_Yd, trans_data_t, Y_d, dtype='float32')
+#     pca_data = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
+#     if not os.path.exists(f'{save_root}/cell_nmf_dff'):
+#         os.makedirs(f'{save_root}/cell_nmf_dff')
+#     da.map_blocks(compute_cell_denoise_dff, baseline_t, pca_data, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, dt=dt).compute()
+#     cluster.stop_all_jobs()
+#     cluster.close()
+#     return None
