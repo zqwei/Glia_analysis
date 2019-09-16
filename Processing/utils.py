@@ -406,65 +406,6 @@ def pos_sig_correction(mov, dt, axis_=-1):
     return mov - (mov[:, :, dt]).min(axis=axis_, keepdims=True)
 
 
-
-# def compute_cell_raw_dff(block_F0, block_dF, save_root='.', block_id=None):
-#     from fish_proc.utils.demix import recompute_C_matrix
-#     import pickle
-#     fname = demix_file_name_block(save_root=save_root, block_id=block_id)
-#     if not os.path.exists(fname):
-#         return np.zeros([1]*4)
-#     else:
-#         A = load_A_matrix(save_root=save_root, block_id=block_id)
-#         if A is None:
-#             return np.zeros([1]*4)
-#         if A.shape[1] == 0:
-#             return np.zeros([1]*4)
-
-#     fsave = f'{save_root}/cell_raw_dff/period_Y_demix_block_'
-#     for _ in block_id:
-#         fsave += '_'+str(_)
-#     fsave += '_rlt.h5'
-#     _, d1, d2, _ = block_F0.shape
-#     cell_F0 = recompute_C_matrix(block_F0.squeeze(axis=0), A)
-#     cell_dF = recompute_C_matrix(block_dF.squeeze(axis=0), A)
-#     A = A.reshape((d1, d2, -1), order="F")
-#     with File(fsave, 'w') as f:
-#         f.create_dataset('A', data=A, compression='gzip', chunks=True, shuffle=True)
-#         f.create_dataset('cell_dF', data=cell_dF, compression='gzip', chunks=True, shuffle=True)
-#         f.create_dataset('cell_F0', data=cell_F0, compression='gzip', chunks=True, shuffle=True)
-#         f.close()
-#     return np.zeros([1]*4)
-
-
-# def compute_cell_denoise_dff(block_F0, block_dF, save_root='.', dt=5, block_id=None):
-#     from fish_proc.utils.demix import recompute_C_matrix
-#     import pickle
-#     fname = demix_file_name_block(save_root=save_root, block_id=block_id)
-#     if not os.path.exists(fname):
-#         return np.zeros([1]*4)
-#     else:
-#         A, b = load_Ab_matrix(fname, min_size=40)
-#         if A is None:
-#             return np.zeros([1]*4)
-#         if A.shape[1] == 0:
-#             return np.zeros([1]*4)
-#     fsave = f'{save_root}/cell_nmf_dff/period_Y_demix_block_'
-#     for _ in block_id:
-#         fsave += '_'+str(_)
-#     fsave += '_rlt.h5'
-#     _, d1, d2, _ = block_F0.shape
-#     cell_F0 = recompute_C_matrix(block_F0.squeeze(axis=0), A)
-#     dF = pos_sig_correction(block_dF.squeeze(axis=0), dt) - b.reshape((d1, d2, 1), order="F")
-#     cell_dF = recompute_C_matrix(dF, A)
-#     A = A.reshape((d1, d2, -1), order="F")
-#     with File(fsave, 'w') as f:
-#         f.create_dataset('A', data=A, compression='gzip', chunks=True, shuffle=True)
-#         f.create_dataset('cell_dF', data=cell_dF, compression='gzip', chunks=True, shuffle=True)
-#         f.create_dataset('cell_F0', data=cell_F0, compression='gzip', chunks=True, shuffle=True)
-#         f.close()
-#     return np.zeros([1]*4)
-
-
 def compute_cell_raw_dff(block_F0, block_dF, save_root='.', ext='', block_id=None):
     from fish_proc.utils.demix import recompute_C_matrix
     _, x_, y_, _ = block_F0.shape
@@ -487,14 +428,10 @@ def compute_cell_raw_dff(block_F0, block_dF, save_root='.', ext='', block_id=Non
     dF = block_dF.squeeze(axis=0).reshape((x_*y_, -1), order='F')
 
     if A_.sum()>0:
-#         cell_F0 = recompute_C_matrix(block_F0.squeeze(axis=0), A_)
-#         cell_dF = recompute_C_matrix(block_dF.squeeze(axis=0), A_)
         cell_F0 = np.matmul(A_.T, F0)
         cell_dF = np.matmul(A_.T, dF)
     
     if A_ext.sum()>0:
-#         cell_F0_ext = recompute_C_matrix(block_F0.squeeze(axis=0), A_ext)
-#         cell_dF_ext = recompute_C_matrix(block_dF.squeeze(axis=0), A_ext)
         cell_F0_ext = np.matmul(A_ext.T, F0)
         cell_dF_ext = np.matmul(A_ext.T, dF)
     
