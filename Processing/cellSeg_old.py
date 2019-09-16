@@ -17,7 +17,7 @@ memory_limit = 0 # unlimited
 if not os.path.exists(save_root):
     os.makedirs(save_root)
 
-nsplit = (8, 16)
+nsplit = (16, 32)
 baseline_percentile = 20  
 baseline_window = 1000   # number of frames
 cameraNoiseMat = '/nrs/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
@@ -54,10 +54,10 @@ if False:
         plt.show()
     fdask.terminate_workers(cluster, client)
 
-print('========================')
-print('Denoise')
-if not os.path.exists(f'{save_root}/masked_local_pca_data.zarr'):
-    local_pca_on_mask(save_root, is_dff=False, dask_tmp=dask_tmp, memory_limit=memory_limit)
+# print('========================')
+# print('Denoise')
+# if not os.path.exists(f'{save_root}/masked_local_pca_data.zarr'):
+#     local_pca_on_mask(save_root, is_dff=False, dask_tmp=dask_tmp, memory_limit=memory_limit)
 
 print('========================')
 print('Demix')
