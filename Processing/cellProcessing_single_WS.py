@@ -23,7 +23,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (
     # set worker
     cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
     print_client_links(cluster)
-    
+
     if not os.path.exists(f'{save_root}/denoised_data.zarr'):
         if not is_bz2:
             files = sorted(glob(dir_root+'/*.h5'))
@@ -92,7 +92,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (
             del trans_data_
             if os.path.exists(f'{save_root}/denoised_data.zarr'):
                 shutil.rmtree(f'{save_root}/denoised_data.zarr')
-            
+
         # fix memory issue to load data all together for transpose on local machine
         # load data
         trans_data_ = da.from_zarr(f'{save_root}/motion_corrected_data_tmp.zarr')
@@ -108,8 +108,8 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (
                 del trans_data_t_z
                 gc.collect()
                 print('finishing rechunking time chunk -- %03d of %03d'%(nz, num_t_chunks))
-        
-        print('Remove temporal files of registration')      
+
+        print('Remove temporal files of registration')
         if os.path.exists(f'{save_root}/motion_corrected_data_tmp.zarr'):
             shutil.rmtree(f'{save_root}/motion_corrected_data_tmp.zarr')
 
@@ -138,22 +138,30 @@ def detrend_data(dir_root, save_root, window=100, percentile=20, nsplit = (4, 4)
 
 
 def default_mask(dir_root, save_root, dask_tmp=None, memory_limit=0):
-    if not os.path.exists(f'{save_root}/Y_max.zarr'):
-        cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
-        print_client_links(cluster)
-        print('Compute default mask ---')
-        Y = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
-        Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
-        Y_b = Y - Y_d
-        Y_b_max_mask = Y_b.max(axis=-1, keepdims=True)>2
-        Y_b_min_mask = Y_b.min(axis=-1, keepdims=True)>1
-        mask = Y_b_max_mask & Y_b_min_mask
-        mask.to_zarr(f'{save_root}/mask_map.zarr', overwrite=True)
-        Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
-        Y_d_max = Y_d.max(axis=-1, keepdims=True)
-        print('Save average data ---')
-        Y_d_max.to_zarr(f'{save_root}/Y_max.zarr', overwrite=True)
-        fdask.terminate_workers(cluster, client)
+    cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
+    print_client_links(cluster)
+    print('Compute default mask ---')
+    Y = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+    Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+    Y_b = Y - Y_d
+    Y_b_min = Y_b.min(axis=-1, keepdims=True)
+    Y_b_min.to_zarr(f'{save_root}/Y_b_min.zarr', overwrite=True)
+    Y_b_max = Y_b.max(axis=-1, keepdims=True)
+    Y_b_max.to_zarr(f'{save_root}/Y_b_min.zarr', overwrite=True)
+    # Y_b_max_mask = Y_b.max(axis=-1, keepdims=True)>2
+    # Y_b_min_mask = Y_b.min(axis=-1, keepdims=True)>1
+    # mask = Y_b_max_mask & Y_b_min_mask
+    # mask.to_zarr(f'{save_root}/mask_map.zarr', overwrite=True)
+    # Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+    Y_d_max = Y_d.max(axis=-1, keepdims=True)
+    Y_d_max.to_zarr(f'{save_root}/Y_d_max.zarr', overwrite=True)
+    Y_max = Y.max(axis=-1, keepdims=True)
+    Y_max.to_zarr(f'{save_root}/Y_max.zarr', overwrite=True)
+    Y_ave = Y.mean(axis=-1, keepdims=True)
+    Y_ave.to_zarr(f'{save_root}/Y_ave.zarr', overwrite=True)
+    Y_std = Y.std(axis=-1, keepdims=True)
+    Y_std.to_zarr(f'{save_root}/Y_std.zarr', overwrite=True)
+    fdask.terminate_workers(cluster, client)
     return None
 
 
@@ -245,7 +253,7 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
         A_[A_<A_.max()*0] = 0
         for n in range(A_.shape[-1]):
             n_max = A_[:, n].max()
-            A_[A_[:,n]<n_max*0, n] = 0
+            A_[A_[:,n]<n_max*0.2, n] = 0
         A_comp = np.zeros(A_.shape[0])
         A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + 1
         A_comp[A_comp>0] = A_comp[A_comp>0]%20+1
@@ -261,11 +269,6 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
         plt.imshow(A_comp.reshape(y_, x_).T)
         plt.axis('off')
         plt.show()
-        if plot_mask:
-            plt.imshow(mask_, cmap='gray', alpha=0.5)
-            plt.title('Components')
-            plt.axis('off')
-            plt.show()
     except:
         print('No components')
     if plot_global:
@@ -291,7 +294,7 @@ def check_demix_cells_layer(save_root, nlayer, nsplit = (10, 16)):
     for nx in range(nsplit[0]):
         for ny in range(nsplit[1]):
             try:
-                A_ = load_A_matrix(save_root=save_root, ext='_v1', block_id=(nlayer, nx, ny, 0), min_size=0)
+                A_ = load_A_matrix(save_root=save_root, ext='', block_id=(nlayer, nx, ny, 0), min_size=0)
                 for n in range(A_.shape[-1]):
                     n_max = A_[:, n].max()
                     A_[A_[:,n]<n_max*0.2, n] = 0
@@ -350,26 +353,6 @@ def check_demix_cells_whole_brain(save_root, nsplit = (10, 16)):
     return None
 
 
-# def compute_cell_dff_pixels(save_root, numCores=20):
-#     '''
-#       1. local pca denoise (\delta F signal)
-#       2. baseline
-#       3. Cell weight matrix apply to denoise and baseline
-#       4. dff
-#     '''
-#     # set worker
-#     cluster, client = fdask.setup_workers(numCores)
-#     print_client_links(cluster)
-#     trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
-#     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
-#     baseline_t = da.map_blocks(baseline_from_Yd, trans_data_t, Y_d, dtype='float32')
-#     dff = Y_d/baseline_t
-#     dff.to_zarr(f'{save_root}/pixel_dff.zarr', overwrite=True)
-#     cluster.stop_all_jobs()
-#     cluster.close()
-#     return None
-
-
 def compute_cell_dff_raw(save_root, dask_tmp=None, memory_limit=0):
     '''
       1. local pca denoise (\delta F signal)
@@ -390,27 +373,3 @@ def compute_cell_dff_raw(save_root, dask_tmp=None, memory_limit=0):
     da.map_blocks(compute_cell_raw_dff, baseline_t, Y_d, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, ext='').compute()
     fdask.terminate_workers(cluster, client)
     return None
-
-
-# def compute_cell_dff_NMF(save_root, numCores=20, dt=3):
-#     '''
-#       1. local pca denoise (\delta F signal)
-#       2. baseline
-#       3. Cell weight matrix apply to denoise and baseline
-#       4. dff
-#     '''
-#     # set worker
-#     if not os.path.exists(f'{save_root}/cell_nmf_dff'):
-#         os.mkdir(f'{save_root}/cell_nmf_dff')
-#     cluster, client = fdask.setup_workers(numCores)
-#     print_client_links(cluster)
-#     trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
-#     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
-#     baseline_t = da.map_blocks(baseline_from_Yd, trans_data_t, Y_d, dtype='float32')
-#     pca_data = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
-#     if not os.path.exists(f'{save_root}/cell_nmf_dff'):
-#         os.makedirs(f'{save_root}/cell_nmf_dff')
-#     da.map_blocks(compute_cell_denoise_dff, baseline_t, pca_data, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, dt=dt).compute()
-#     cluster.stop_all_jobs()
-#     cluster.close()
-#     return None

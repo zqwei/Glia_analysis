@@ -319,26 +319,16 @@ def load_sup_A_matrix(save_root='.', ext='', block_id=None, min_size=0):
 
 
 def load_A_matrix(save_root='.', ext='', block_id=None, min_size=40):
-    import pickle
-    fname = demix_file_name_block(save_root=save_root, ext=ext, block_id=block_id)
-    with open(fname, 'rb') as f:
-        try:
-            rlt_ = pickle.load(f)
-            A = rlt_['fin_rlt']['a']
-            return A[:, (A>0).sum(axis=0)>min_size]
-        except:
-            return None
-
-
-def load_Ab_matrix(fname, min_size=40):
-    import pickle
-    with open(fname, 'rb') as f:
-        try:
-            rlt_ = pickle.load(f)
-            A = rlt_['fin_rlt']['a']
-            return A[:, (A>0).sum(axis=0)>min_size], rlt_['fin_rlt']['b']
-        except:
-            return None, None
+    fname = sup_file_name_block(save_root=save_root, ext=ext, block_id=block_id)
+    _ = np.load(fname, allow_pickle=True)
+    return _['A']
+    # with open(fname, 'rb') as f:
+    #     try:
+    #         rlt_ = pickle.load(f)
+    #         A = rlt_['fin_rlt']['a']
+    #         return A[:, (A>0).sum(axis=0)>min_size]
+    #     except:
+    #         return None
 
 
 def pos_sig_correction(mov, dt, axis_=-1):

@@ -63,3 +63,6 @@ print('Demix')
 dt = 3
 is_skip = False
 demix_cells(save_root, dt, is_skip=is_skip, dask_tmp=dask_tmp, memory_limit=memory_limit)
+
+print('========================')
+print('DF/F computation')
