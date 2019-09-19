@@ -8,8 +8,11 @@ import dask.array as da
 import numpy as np
 import matplotlib.pyplot as plt
 
-dir_root = '/nrs/ahrens/jing/giving_up/20190430/fish01/6dpf_HuC-GCaMP7ff-GFAP-RGECO_GU-slow-fwd_fish01_exp01_20190430_174349/im'
-save_root = '/nrs/ahrens/Ziqiang/Jing_Glia_project/Processed_data/20190430/fish01/6dpf_HuC-GCaMP7ff-GFAP-RGECO_GU-slow-fwd_fish01_exp01_20190430_174349/'
+# dir_root = '/nrs/ahrens/jing/giving_up/20190430/fish01/6dpf_HuC-GCaMP7ff-GFAP-RGECO_GU-slow-fwd_fish01_exp01_20190430_174349/im'
+# save_root = '/nrs/ahrens/Ziqiang/Jing_Glia_project/Processed_data/20190430/fish01/6dpf_HuC-GCaMP7ff-GFAP-RGECO_GU-slow-fwd_fish01_exp01_20190430_174349/'
+
+dir_root = '/nrs/ahrens/jing/giving_up/20190426/fish03/7dpf_HuC-H2B_GCaMP7ff_GU-slow-fwd_fish03_exp02_20190426_221213/im'
+save_root = '/nrs/ahrens/Ziqiang/Jing_Glia_project/Processed_data/20190426/fish03/7dpf_HuC-H2B_GCaMP7ff_GU-slow-fwd_fish03_exp02_20190426_221213/'
 
 dask_tmp = '/opt/data/weiz/dask-worker-space'
 memory_limit = 0 # unlimited
@@ -54,25 +57,9 @@ if False:
         plt.show()
     fdask.terminate_workers(cluster, client)
 
-# print('========================')
-# print('Denoise')
-# if not os.path.exists(f'{save_root}/masked_local_pca_data.zarr'):
-#     local_pca_on_mask(save_root, is_dff=False, dask_tmp=dask_tmp, memory_limit=memory_limit)
 
 print('========================')
 print('Demix')
 dt = 3
-# is_skip = True
-# params = {'cut_perc': True, 
-#           'cut_off_point':[95, 80, 60, 20], 
-#           'length_cut':[20, 20, 40, 40], 
-#           'max_allow_neuron_size':0.9, 
-#           'patch_size':[10, 10],
-#           'max_iter':50,
-#           'max_iter_fin':90,
-#           'update_after':40}
-
-# demix_cells(save_root, dt, params=params, is_skip=is_skip, dask_tmp=dask_tmp, memory_limit=memory_limit)
-
 is_skip = False
-sup_cells(save_root, dt, is_skip=is_skip, dask_tmp=dask_tmp, memory_limit=memory_limit)
+demix_cells(save_root, dt, is_skip=is_skip, dask_tmp=dask_tmp, memory_limit=memory_limit)
