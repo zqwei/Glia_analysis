@@ -172,37 +172,55 @@ def local_pca_on_mask(save_root, is_dff=False, dask_tmp=None, memory_limit=0):
     return None
 
 
-def demix_cells(save_root, dt, params=None, is_skip=True, dask_tmp=None, memory_limit=0):
+# def demix_cells(save_root, dt, params=None, is_skip=True, dask_tmp=None, memory_limit=0):
+#     '''
+#       1. local pca denoise
+#       2. cell segmentation
+#     '''
+#     cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
+#     print_client_links(cluster)
+#     Y_svd = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
+#     Y_svd = Y_svd[:, :, :, ::dt]
+#     mask = da.from_zarr(f'{save_root}/mask_map.zarr')
+#     if not os.path.exists(f'{save_root}/demix_rlt/'):
+#         os.mkdir(f'{save_root}/demix_rlt/')
+#     da.map_blocks(demix_blocks, Y_svd, mask, chunks=(1, 1, 1, 1), dtype='int8', save_folder=save_root, is_skip=is_skip, params=params).compute()
+#     fdask.terminate_workers(cluster, client)
+#     time.sleep(10)
+#     return None
+
+
+# def sup_cells(save_root, dt, is_skip=True, dask_tmp=None, memory_limit=0):
+#     '''
+#       1. local pca denoise
+#       2. cell segmentation
+#     '''
+#     cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
+#     print_client_links(cluster)
+#     Y_svd = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
+#     Y_svd = Y_svd[:, :, :, ::dt]
+#     mask = da.from_zarr(f'{save_root}/mask_map.zarr')
+#     if not os.path.exists(f'{save_root}/sup_demix_rlt/'):
+#         os.mkdir(f'{save_root}/sup_demix_rlt/')
+#     da.map_blocks(sup_blocks, Y_svd, mask, chunks=(1, 1, 1, 1), dtype='int8', save_folder=save_root, is_skip=is_skip).compute()
+#     fdask.terminate_workers(cluster, client)
+#     time.sleep(10)
+#     return None
+
+
+def demix_cells(save_root, dt, is_skip=True, dask_tmp=None, memory_limit=0):
     '''
       1. local pca denoise
       2. cell segmentation
     '''
     cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
     print_client_links(cluster)
-    Y_svd = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
+    Y_svd = da.from_zarr(f'{save_root}/detrend_data.zarr')
     Y_svd = Y_svd[:, :, :, ::dt]
-    mask = da.from_zarr(f'{save_root}/mask_map.zarr')
-    if not os.path.exists(f'{save_root}/demix_rlt/'):
-        os.mkdir(f'{save_root}/demix_rlt/')
-    da.map_blocks(demix_blocks, Y_svd, mask, chunks=(1, 1, 1, 1), dtype='int8', save_folder=save_root, is_skip=is_skip, params=params).compute()
-    fdask.terminate_workers(cluster, client)
-    time.sleep(10)
-    return None
-
-
-def sup_cells(save_root, dt, is_skip=True, dask_tmp=None, memory_limit=0):
-    '''
-      1. local pca denoise
-      2. cell segmentation
-    '''
-    cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
-    print_client_links(cluster)
-    Y_svd = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
-    Y_svd = Y_svd[:, :, :, ::dt]
-    mask = da.from_zarr(f'{save_root}/mask_map.zarr')
+    mask = da.from_zarr(f'{save_root}/Y_max.zarr')
     if not os.path.exists(f'{save_root}/sup_demix_rlt/'):
         os.mkdir(f'{save_root}/sup_demix_rlt/')
-    da.map_blocks(sup_blocks, Y_svd, mask, chunks=(1, 1, 1, 1), dtype='int8', save_folder=save_root, is_skip=is_skip).compute()
+    da.map_blocks(demix_blocks, Y_svd, mask, chunks=(1, 1, 1, 1), dtype='int8', save_folder=save_root, is_skip=is_skip).compute()
     fdask.terminate_workers(cluster, client)
     time.sleep(10)
     return None
