@@ -218,85 +218,12 @@ def mask_blocks(block, mask=None):
     return _
 
 
-def demix_blocks(block, mask_block, save_folder='.', is_skip=True, params=None, block_id=None):
-    # this uses old parameter set up
-    import pickle
-    from pathlib import Path
-    import sys
-    from fish_proc.demix import superpixel_analysis as sup
-    from fish_proc.utils.snr import local_correlations_fft
-    is_demix = False
-    
-    # set fname for blocks
-    fname = f'{save_folder}/demix_rlt/period_Y_demix_block_'
-    for _ in block_id:
-        fname += '_'+str(_)
-    # set no processing conditions
-    if os.path.exists(fname+'_rlt.pkl') and is_skip:
-        return np.zeros([1]*4)
-    if mask_block.sum() ==0:
-        Path(fname+'_empty_rlt.tmp').touch()
-        return np.zeros([1]*4)
-    M = block.squeeze().copy()
-    M[~mask_block.squeeze()] = 0
-    Cblock = local_correlations_fft(M, is_mp=False)
-    if (Cblock>0).sum()==0:
-        Path(fname+'_empty_rlt.tmp').touch()
-        return np.zeros([1]*4)
-    
-    # get parameters
-    if params is None:
-        cut_off_point = np.percentile(Cblock[:], [99, 95, 80, 50])
-        length_cut=[60, 40, 40, 40]
-        max_allow_neuron_size=0.15
-        patch_size=[10, 10]
-        max_iter=50
-        max_iter_fin=90
-        update_after=40
-    else:
-        if params['cut_perc']:
-            cut_off_point = np.percentile(Cblock[:], params['cut_off_point'])
-        else:
-            cut_off_point = params['cut_off_point']
-        length_cut=params['length_cut']
-        max_allow_neuron_size=params['max_allow_neuron_size']
-        patch_size=params['patch_size']
-        max_iter=params['max_iter']
-        max_iter_fin=params['max_iter_fin']
-        update_after=params['update_after']
-    pass_num = len(cut_off_point)
-    pass_num_max = len(cut_off_point)
-    th = [1] * pass_num_max
-    residual_cut = [0.6] * pass_num_max
-    # demix
-    while not is_demix and pass_num>=0:
-        try:
-            rlt_= sup.demix_whole_data(M, cut_off_point[pass_num_max-pass_num:], length_cut=length_cut[pass_num_max-pass_num:],
-                                       th=th, pass_num=pass_num, residual_cut=residual_cut, corr_th_fix=0.3, max_allow_neuron_size=max_allow_neuron_size,
-                                       merge_overlap_thr=0.6, patch_size=patch_size, text=False, bg=False, max_iter=max_iter,
-                                       max_iter_fin=max_iter_fin, update_after=update_after)
-            is_demix = True
-        except:
-            print(f'fail at pass_num {pass_num}', flush=True)
-            is_demix = False
-            pass_num -= 1
-    try:
-        with open(fname+'_rlt.pkl', 'wb') as f:
-            pickle.dump(rlt_, f)
-    except:
-        Path(fname+'_empty_rlt.tmp').touch()
-        pass
-    return np.zeros([1]*4)
-
-
-def sup_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None):
-    # this uses old parameter set up
-    import pickle
-    from pathlib import Path
-    import sys
-    from fish_proc.demix import superpixel_analysis as sup
-    from fish_proc.utils.snr import local_correlations_fft
-    is_demix = False
+def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None):
+    from skimage.exposure import equalize_adapthist as clahe
+    from skimage.morphology import square, dilation
+    from skimage.segmentation import watershed
+    from sklearn.decomposition import NMF
+    from scipy.sparse import csr_matrix
     
     # set fname for blocks
     fname = 'period_Y_demix_block_'
@@ -304,54 +231,202 @@ def sup_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None):
         fname += '_'+str(_)
     # set no processing conditions
     sup_fname = f'{save_folder}/sup_demix_rlt/'+fname
-    demix_fname = f'{save_folder}/demix_rlt/'+fname
-    # file exist -- skip
-    if os.path.exists(sup_fname+'_rlt.npz') and is_skip:
-        return np.zeros([1]*4)
-    # no pixels -- skip
-    if mask_block.sum() ==0:
-        Path(sup_fname+'_empty_rlt.tmp').touch()
-        return np.zeros([1]*4)
-    M = block.squeeze().copy()
-    M[~mask_block.squeeze()] = 0
-    Cblock = local_correlations_fft(M, is_mp=False)
-    # no corrlated pixel -- skip
-    if (Cblock>0).sum()==0:
-        Path(sup_fname+'_empty_rlt.tmp').touch()
-        return np.zeros([1]*4)
     
-    cut_off_point = np.percentile(Cblock[:], 10) # set 1% correlation as threshould
-    cut_off_point = max(cut_off_point, 0.2) # force it larger than 0.01
-    _, x_, y_, _ = block.shape
-    
-    # load demixed A matrix
+    block_img = mask_block.squeeze()
+    if block_img.max()==0:
+        np.savez(sup_fname+'_rlt.npz', A=np.zeros([np.prod(dims[:-1]),1]))
+        return np.zeros([1]*4)
     try:
-        A_ = load_A_matrix(save_root=save_folder, ext='', block_id=block_id, min_size=0)
+        img_adapteq = clahe(block_img/block_img.max(), clip_limit=0.03)
     except:
-        A_ = np.zeros((x_*y_, 1))
-    if A_ is None:
-        A_ = np.zeros((x_*y_, 1))
-    # reset small weights to zeros
-    for n in range(A_.shape[-1]):
-        n_max = A_[:, n].max()
-        A_[A_[:,n]<n_max*0.2, n] = 0
-    # valid_pixels
-    valid_pixels = A_.sum(-1)>0
-    valid_pixels = valid_pixels.reshape(x_, y_, order='F')
-    M[valid_pixels] = 0
+        img_adapteq = block_img
+    # initial segments
+    segments_watershed = watershed(img_adapteq, markers=100, compactness=0.01)
+    min_ = segments_watershed.min()
+    max_ = segments_watershed.max()
+    vec_segments_watershed = segments_watershed.reshape(-1, 1, order='F')
+    a_ini = np.zeros((vec_segments_watershed.shape[0], max_+1))
+    for n in range(min_, max_+1):
+        if (vec_segments_watershed[:,0]==n).sum()>10:
+            _ = (segments_watershed==n)
+            _ = dilation(_, square(5)).astype('float')
+            _ = _.reshape(-1, order='F')
+            a_ini[_>0, n]=1
+    a_ini = a_ini[:, a_ini.sum(0)>0]>0
     
-    if (M.sum(-1)>0).sum()==0:
-        np.savez(sup_fname+'_rlt.npz', A=A_, A_ext=np.zeros((x_*y_,1)))
-    try:
-        rlt_= sup.demix_whole_data(M, [cut_off_point], length_cut=[10],th=[0], pass_num=1, residual_cut=[0.6], 
-                                   corr_th_fix=0.3, max_allow_neuron_size=.80, merge_overlap_thr=0.6, 
-                                   patch_size=[10, 10], text=False, bg=False, max_iter=0,max_iter_fin=0, update_after=0)
-    except Exception as e:
-        print(e)
-        print(block_id)
-    A_ext=rlt_['fin_rlt']['a']
-    np.savez(sup_fname+'_rlt.npz', A=A_, A_ext=A_ext)
+    Yt = block.squeeze()    
+    dims = Yt.shape;
+    T = dims[-1];
+    Yt_r = Yt.reshape(np.prod(dims[:-1]),T,order = "F");
+    Yt_r[Yt_r<0]=0
+    Yt_r = csr_matrix(Yt_r);
+    model = NMF(n_components=1, init='custom')
+    U_mat = []
+    V_mat = []
+    if Yt_r.sum()==0:
+        np.savez(sup_fname+'_rlt.npz', A=np.zeros([np.prod(dims[:-1]),1]))
+        return np.zeros([1]*4)
+    for ii, comp in enumerate(a_ini.T):
+        y_temp = Yt_r[comp,:].astype('float')
+        if y_temp.sum()==0:
+            continue
+        u_ = np.zeros((np.prod(dims[:-1]),1)).astype('float32')
+        u_[list(comp)] = model.fit_transform(y_temp, W=np.array(y_temp.mean(axis=1)),H = np.array(y_temp.mean(axis=0)))
+        U_mat.append(u_)
+        V_mat.append(model.components_.T)
+    if len(U_mat)>1:
+        U_mat = np.concatenate(U_mat, axis=1)
+        V_mat = np.concatenate(V_mat, axis=1)
+    else:
+        U_mat = np.zeros([np.prod(dims[:-1]),1])
+        V_mat = np.zeros([T,1])
+    
+    if U_mat.sum()>0:
+        model_ = NMF(n_components=U_mat.shape[-1], init='custom', solver='cd', max_iter=20)
+        U = model_.fit_transform(Yt_r.astype('float'), W=U_mat.astype('float64'), H=V_mat.T.astype('float64'))
+    else:
+        U = np.zeros([np.prod(dims[:-1]),1])
+    temp = np.sqrt((U**2).sum(axis=0,keepdims=True))
+    U = U/temp
+    U[U<U.max(axis=-1, keepdims=True)*.2]=0
+    np.savez(sup_fname+'_rlt.npz', A=U)
     return np.zeros([1]*4)
+
+
+# def demix_blocks_(block, mask_block, save_folder='.', is_skip=True, params=None, block_id=None):
+#     # this uses old parameter set up
+#     import pickle
+#     from pathlib import Path
+#     import sys
+#     from fish_proc.demix import superpixel_analysis as sup
+#     from fish_proc.utils.snr import local_correlations_fft
+#     is_demix = False
+    
+#     # set fname for blocks
+#     fname = f'{save_folder}/demix_rlt/period_Y_demix_block_'
+#     for _ in block_id:
+#         fname += '_'+str(_)
+#     # set no processing conditions
+#     if os.path.exists(fname+'_rlt.pkl') and is_skip:
+#         return np.zeros([1]*4)
+#     if mask_block.sum() ==0:
+#         Path(fname+'_empty_rlt.tmp').touch()
+#         return np.zeros([1]*4)
+#     M = block.squeeze().copy()
+#     M[~mask_block.squeeze()] = 0
+#     Cblock = local_correlations_fft(M, is_mp=False)
+#     if (Cblock>0).sum()==0:
+#         Path(fname+'_empty_rlt.tmp').touch()
+#         return np.zeros([1]*4)
+    
+#     # get parameters
+#     if params is None:
+#         cut_off_point = np.percentile(Cblock[:], [99, 95, 80, 50])
+#         length_cut=[60, 40, 40, 40]
+#         max_allow_neuron_size=0.15
+#         patch_size=[10, 10]
+#         max_iter=50
+#         max_iter_fin=90
+#         update_after=40
+#     else:
+#         if params['cut_perc']:
+#             cut_off_point = np.percentile(Cblock[:], params['cut_off_point'])
+#         else:
+#             cut_off_point = params['cut_off_point']
+#         length_cut=params['length_cut']
+#         max_allow_neuron_size=params['max_allow_neuron_size']
+#         patch_size=params['patch_size']
+#         max_iter=params['max_iter']
+#         max_iter_fin=params['max_iter_fin']
+#         update_after=params['update_after']
+#     pass_num = len(cut_off_point)
+#     pass_num_max = len(cut_off_point)
+#     th = [1] * pass_num_max
+#     residual_cut = [0.6] * pass_num_max
+#     # demix
+#     while not is_demix and pass_num>=0:
+#         try:
+#             rlt_= sup.demix_whole_data(M, cut_off_point[pass_num_max-pass_num:], length_cut=length_cut[pass_num_max-pass_num:],
+#                                        th=th, pass_num=pass_num, residual_cut=residual_cut, corr_th_fix=0.3, max_allow_neuron_size=max_allow_neuron_size,
+#                                        merge_overlap_thr=0.6, patch_size=patch_size, text=False, bg=False, max_iter=max_iter,
+#                                        max_iter_fin=max_iter_fin, update_after=update_after)
+#             is_demix = True
+#         except:
+#             print(f'fail at pass_num {pass_num}', flush=True)
+#             is_demix = False
+#             pass_num -= 1
+#     try:
+#         with open(fname+'_rlt.pkl', 'wb') as f:
+#             pickle.dump(rlt_, f)
+#     except:
+#         Path(fname+'_empty_rlt.tmp').touch()
+#         pass
+#     return np.zeros([1]*4)
+
+
+# def sup_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None):
+#     # this uses old parameter set up
+#     import pickle
+#     from pathlib import Path
+#     import sys
+#     from fish_proc.demix import superpixel_analysis as sup
+#     from fish_proc.utils.snr import local_correlations_fft
+#     is_demix = False
+    
+#     # set fname for blocks
+#     fname = 'period_Y_demix_block_'
+#     for _ in block_id:
+#         fname += '_'+str(_)
+#     # set no processing conditions
+#     sup_fname = f'{save_folder}/sup_demix_rlt/'+fname
+#     demix_fname = f'{save_folder}/demix_rlt/'+fname
+#     # file exist -- skip
+#     if os.path.exists(sup_fname+'_rlt.npz') and is_skip:
+#         return np.zeros([1]*4)
+#     # no pixels -- skip
+#     if mask_block.sum() ==0:
+#         Path(sup_fname+'_empty_rlt.tmp').touch()
+#         return np.zeros([1]*4)
+#     M = block.squeeze().copy()
+#     M[~mask_block.squeeze()] = 0
+#     Cblock = local_correlations_fft(M, is_mp=False)
+#     # no corrlated pixel -- skip
+#     if (Cblock>0).sum()==0:
+#         Path(sup_fname+'_empty_rlt.tmp').touch()
+#         return np.zeros([1]*4)
+    
+#     cut_off_point = np.percentile(Cblock[:], 10) # set 1% correlation as threshould
+#     cut_off_point = max(cut_off_point, 0.2) # force it larger than 0.01
+#     _, x_, y_, _ = block.shape
+    
+#     # load demixed A matrix
+#     try:
+#         A_ = load_A_matrix(save_root=save_folder, ext='', block_id=block_id, min_size=0)
+#     except:
+#         A_ = np.zeros((x_*y_, 1))
+#     if A_ is None:
+#         A_ = np.zeros((x_*y_, 1))
+#     # reset small weights to zeros
+#     for n in range(A_.shape[-1]):
+#         n_max = A_[:, n].max()
+#         A_[A_[:,n]<n_max*0.2, n] = 0
+#     # valid_pixels
+#     valid_pixels = A_.sum(-1)>0
+#     valid_pixels = valid_pixels.reshape(x_, y_, order='F')
+#     M[valid_pixels] = 0
+    
+#     if (M.sum(-1)>0).sum()==0:
+#         np.savez(sup_fname+'_rlt.npz', A=A_, A_ext=np.zeros((x_*y_,1)))
+#     try:
+#         rlt_= sup.demix_whole_data(M, [cut_off_point], length_cut=[10],th=[0], pass_num=1, residual_cut=[0.6], 
+#                                    corr_th_fix=0.3, max_allow_neuron_size=.80, merge_overlap_thr=0.6, 
+#                                    patch_size=[10, 10], text=False, bg=False, max_iter=0,max_iter_fin=0, update_after=0)
+#     except Exception as e:
+#         print(e)
+#         print(block_id)
+#     A_ext=rlt_['fin_rlt']['a']
+#     np.savez(sup_fname+'_rlt.npz', A=A_, A_ext=A_ext)
+#     return np.zeros([1]*4)
 
 
 def demix_file_name_block(save_root='.', ext='', block_id=None):
