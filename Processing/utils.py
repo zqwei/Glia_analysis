@@ -224,14 +224,14 @@ def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None
     from skimage.segmentation import watershed
     from sklearn.decomposition import NMF
     from scipy.sparse import csr_matrix
-    
+
     # set fname for blocks
     fname = 'period_Y_demix_block_'
     for _ in block_id:
         fname += '_'+str(_)
     # set no processing conditions
     sup_fname = f'{save_folder}/sup_demix_rlt/'+fname
-    
+
     block_img = mask_block.squeeze()
     if block_img.max()==0:
         np.savez(sup_fname+'_rlt.npz', A=np.zeros([np.prod(dims[:-1]),1]))
@@ -253,8 +253,8 @@ def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None
             _ = _.reshape(-1, order='F')
             a_ini[_>0, n]=1
     a_ini = a_ini[:, a_ini.sum(0)>0]>0
-    
-    Yt = block.squeeze()    
+
+    Yt = block.squeeze()
     dims = Yt.shape;
     T = dims[-1];
     Yt_r = Yt.reshape(np.prod(dims[:-1]),T,order = "F");
@@ -280,7 +280,7 @@ def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None
     else:
         U_mat = np.zeros([np.prod(dims[:-1]),1])
         V_mat = np.zeros([T,1])
-    
+
     if U_mat.sum()>0:
         model_ = NMF(n_components=U_mat.shape[-1], init='custom', solver='cd', max_iter=20)
         U = model_.fit_transform(Yt_r.astype('float'), W=U_mat.astype('float64'), H=V_mat.T.astype('float64'))
@@ -291,142 +291,6 @@ def demix_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None
     U[U<U.max(axis=-1, keepdims=True)*.2]=0
     np.savez(sup_fname+'_rlt.npz', A=U)
     return np.zeros([1]*4)
-
-
-# def demix_blocks_(block, mask_block, save_folder='.', is_skip=True, params=None, block_id=None):
-#     # this uses old parameter set up
-#     import pickle
-#     from pathlib import Path
-#     import sys
-#     from fish_proc.demix import superpixel_analysis as sup
-#     from fish_proc.utils.snr import local_correlations_fft
-#     is_demix = False
-    
-#     # set fname for blocks
-#     fname = f'{save_folder}/demix_rlt/period_Y_demix_block_'
-#     for _ in block_id:
-#         fname += '_'+str(_)
-#     # set no processing conditions
-#     if os.path.exists(fname+'_rlt.pkl') and is_skip:
-#         return np.zeros([1]*4)
-#     if mask_block.sum() ==0:
-#         Path(fname+'_empty_rlt.tmp').touch()
-#         return np.zeros([1]*4)
-#     M = block.squeeze().copy()
-#     M[~mask_block.squeeze()] = 0
-#     Cblock = local_correlations_fft(M, is_mp=False)
-#     if (Cblock>0).sum()==0:
-#         Path(fname+'_empty_rlt.tmp').touch()
-#         return np.zeros([1]*4)
-    
-#     # get parameters
-#     if params is None:
-#         cut_off_point = np.percentile(Cblock[:], [99, 95, 80, 50])
-#         length_cut=[60, 40, 40, 40]
-#         max_allow_neuron_size=0.15
-#         patch_size=[10, 10]
-#         max_iter=50
-#         max_iter_fin=90
-#         update_after=40
-#     else:
-#         if params['cut_perc']:
-#             cut_off_point = np.percentile(Cblock[:], params['cut_off_point'])
-#         else:
-#             cut_off_point = params['cut_off_point']
-#         length_cut=params['length_cut']
-#         max_allow_neuron_size=params['max_allow_neuron_size']
-#         patch_size=params['patch_size']
-#         max_iter=params['max_iter']
-#         max_iter_fin=params['max_iter_fin']
-#         update_after=params['update_after']
-#     pass_num = len(cut_off_point)
-#     pass_num_max = len(cut_off_point)
-#     th = [1] * pass_num_max
-#     residual_cut = [0.6] * pass_num_max
-#     # demix
-#     while not is_demix and pass_num>=0:
-#         try:
-#             rlt_= sup.demix_whole_data(M, cut_off_point[pass_num_max-pass_num:], length_cut=length_cut[pass_num_max-pass_num:],
-#                                        th=th, pass_num=pass_num, residual_cut=residual_cut, corr_th_fix=0.3, max_allow_neuron_size=max_allow_neuron_size,
-#                                        merge_overlap_thr=0.6, patch_size=patch_size, text=False, bg=False, max_iter=max_iter,
-#                                        max_iter_fin=max_iter_fin, update_after=update_after)
-#             is_demix = True
-#         except:
-#             print(f'fail at pass_num {pass_num}', flush=True)
-#             is_demix = False
-#             pass_num -= 1
-#     try:
-#         with open(fname+'_rlt.pkl', 'wb') as f:
-#             pickle.dump(rlt_, f)
-#     except:
-#         Path(fname+'_empty_rlt.tmp').touch()
-#         pass
-#     return np.zeros([1]*4)
-
-
-# def sup_blocks(block, mask_block, save_folder='.', is_skip=True, block_id=None):
-#     # this uses old parameter set up
-#     import pickle
-#     from pathlib import Path
-#     import sys
-#     from fish_proc.demix import superpixel_analysis as sup
-#     from fish_proc.utils.snr import local_correlations_fft
-#     is_demix = False
-    
-#     # set fname for blocks
-#     fname = 'period_Y_demix_block_'
-#     for _ in block_id:
-#         fname += '_'+str(_)
-#     # set no processing conditions
-#     sup_fname = f'{save_folder}/sup_demix_rlt/'+fname
-#     demix_fname = f'{save_folder}/demix_rlt/'+fname
-#     # file exist -- skip
-#     if os.path.exists(sup_fname+'_rlt.npz') and is_skip:
-#         return np.zeros([1]*4)
-#     # no pixels -- skip
-#     if mask_block.sum() ==0:
-#         Path(sup_fname+'_empty_rlt.tmp').touch()
-#         return np.zeros([1]*4)
-#     M = block.squeeze().copy()
-#     M[~mask_block.squeeze()] = 0
-#     Cblock = local_correlations_fft(M, is_mp=False)
-#     # no corrlated pixel -- skip
-#     if (Cblock>0).sum()==0:
-#         Path(sup_fname+'_empty_rlt.tmp').touch()
-#         return np.zeros([1]*4)
-    
-#     cut_off_point = np.percentile(Cblock[:], 10) # set 1% correlation as threshould
-#     cut_off_point = max(cut_off_point, 0.2) # force it larger than 0.01
-#     _, x_, y_, _ = block.shape
-    
-#     # load demixed A matrix
-#     try:
-#         A_ = load_A_matrix(save_root=save_folder, ext='', block_id=block_id, min_size=0)
-#     except:
-#         A_ = np.zeros((x_*y_, 1))
-#     if A_ is None:
-#         A_ = np.zeros((x_*y_, 1))
-#     # reset small weights to zeros
-#     for n in range(A_.shape[-1]):
-#         n_max = A_[:, n].max()
-#         A_[A_[:,n]<n_max*0.2, n] = 0
-#     # valid_pixels
-#     valid_pixels = A_.sum(-1)>0
-#     valid_pixels = valid_pixels.reshape(x_, y_, order='F')
-#     M[valid_pixels] = 0
-    
-#     if (M.sum(-1)>0).sum()==0:
-#         np.savez(sup_fname+'_rlt.npz', A=A_, A_ext=np.zeros((x_*y_,1)))
-#     try:
-#         rlt_= sup.demix_whole_data(M, [cut_off_point], length_cut=[10],th=[0], pass_num=1, residual_cut=[0.6], 
-#                                    corr_th_fix=0.3, max_allow_neuron_size=.80, merge_overlap_thr=0.6, 
-#                                    patch_size=[10, 10], text=False, bg=False, max_iter=0,max_iter_fin=0, update_after=0)
-#     except Exception as e:
-#         print(e)
-#         print(block_id)
-#     A_ext=rlt_['fin_rlt']['a']
-#     np.savez(sup_fname+'_rlt.npz', A=A_, A_ext=A_ext)
-#     return np.zeros([1]*4)
 
 
 def demix_file_name_block(save_root='.', ext='', block_id=None):
@@ -475,7 +339,7 @@ def load_Ab_matrix(fname, min_size=40):
             return A[:, (A>0).sum(axis=0)>min_size], rlt_['fin_rlt']['b']
         except:
             return None, None
-        
+
 
 def pos_sig_correction(mov, dt, axis_=-1):
     return mov - (mov[:, :, dt]).min(axis=axis_, keepdims=True)
@@ -484,32 +348,32 @@ def pos_sig_correction(mov, dt, axis_=-1):
 def compute_cell_raw_dff(block_F0, block_dF, save_root='.', ext='', block_id=None):
     from fish_proc.utils.demix import recompute_C_matrix
     _, x_, y_, _ = block_F0.shape
-    try: 
+    try:
         A_, A_ext = load_sup_A_matrix(save_root=save_root, ext=ext, block_id=block_id, min_size=0)
     except:
         A_ = np.zeros((x_*y_,1))
-        
+
     if (A_ is None) or (A_.size==0):
         A_ = np.zeros((x_*y_,1))
     if (A_ext is None) or (A_ext.size==0):
-        A_ext = np.zeros((x_*y_,1))    
-        
+        A_ext = np.zeros((x_*y_,1))
+
     fsave = f'{save_root}/cell_raw_dff/period_Y_demix_block_'
     for _ in block_id:
         fsave += '_'+str(_)
     fsave += '_rlt.h5'
-    
+
     F0 = block_F0.squeeze(axis=0).reshape((x_*y_, -1), order='F')
     dF = block_dF.squeeze(axis=0).reshape((x_*y_, -1), order='F')
 
     if A_.sum()>0:
         cell_F0 = np.matmul(A_.T, F0)
         cell_dF = np.matmul(A_.T, dF)
-    
+
     if A_ext.sum()>0:
         cell_F0_ext = np.matmul(A_ext.T, F0)
         cell_dF_ext = np.matmul(A_ext.T, dF)
-    
+
     with File(fsave, 'w') as f:
         f.create_dataset('A_loc', data=np.array([block_id[0], x_*block_id[1], y_*block_id[2]]), compression='gzip', chunks=True, shuffle=True)
         if A_.sum()>0:
@@ -518,7 +382,7 @@ def compute_cell_raw_dff(block_F0, block_dF, save_root='.', ext='', block_id=Non
         else:
             f.create_dataset('A', data=np.nan)
             f.create_dataset('cell_dFF', data=np.nan)
-            
+
         if A_ext.sum()>0:
             f.create_dataset('A_ext', data=A_ext.reshape((x_, y_, -1), order="F"), compression='gzip', chunks=True, shuffle=True)
             f.create_dataset('cell_dFF_ext', data=cell_dF_ext/cell_F0_ext, compression='gzip', chunks=True, shuffle=True)

@@ -21,7 +21,7 @@ if not os.path.exists(save_root):
     os.makedirs(save_root)
 
 nsplit = (16, 32)
-baseline_percentile = 20  
+baseline_percentile = 20
 baseline_window = 1000   # number of frames
 cameraNoiseMat = '/nrs/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
 
