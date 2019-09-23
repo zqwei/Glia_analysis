@@ -307,15 +307,15 @@ def sup_file_name_block(save_root='.', ext='', block_id=None):
     return fname+'_rlt.npz'
 
 
-def load_sup_A_matrix(save_root='.', ext='', block_id=None, min_size=0):
-    fname = sup_file_name_block(save_root=save_root, ext=ext, block_id=block_id)
-    try:
-        _ = np.load(fname, allow_pickle=True)
-        A = _['A']
-        A_ext = _['A_ext']
-        return A, A_ext
-    except:
-        return None, None
+# def load_sup_A_matrix(save_root='.', ext='', block_id=None, min_size=0):
+#     fname = sup_file_name_block(save_root=save_root, ext=ext, block_id=block_id)
+#     try:
+#         _ = np.load(fname, allow_pickle=True)
+#         A = _['A']
+#         A_ext = _['A_ext']
+#         return A, A_ext
+#     except:
+#         return None, None
 
 
 def load_A_matrix(save_root='.', ext='', block_id=None, min_size=40):
@@ -339,14 +339,13 @@ def compute_cell_raw_dff(block_F0, block_dF, save_root='.', ext='', block_id=Non
     from fish_proc.utils.demix import recompute_C_matrix
     _, x_, y_, _ = block_F0.shape
     try:
-        A_, A_ext = load_sup_A_matrix(save_root=save_root, ext=ext, block_id=block_id, min_size=0)
+        A_= load_A_matrix(save_root=save_root, ext=ext, block_id=block_id, min_size=0)
     except:
-        A_ = np.zeros((x_*y_,1))
-
-    if (A_ is None) or (A_.size==0):
-        A_ = np.zeros((x_*y_,1))
-    if (A_ext is None) or (A_ext.size==0):
-        A_ext = np.zeros((x_*y_,1))
+        print(block_id)
+    if A_.sum()==0:
+        return np.zeros([1]*4) # return if no components
+    if np.abs(block_dF).sum()==0:
+        return np.zeros([1]*4) # return if out of brain
 
     fsave = f'{save_root}/cell_raw_dff/period_Y_demix_block_'
     for _ in block_id:
@@ -355,29 +354,12 @@ def compute_cell_raw_dff(block_F0, block_dF, save_root='.', ext='', block_id=Non
 
     F0 = block_F0.squeeze(axis=0).reshape((x_*y_, -1), order='F')
     dF = block_dF.squeeze(axis=0).reshape((x_*y_, -1), order='F')
-
-    if A_.sum()>0:
-        cell_F0 = np.matmul(A_.T, F0)
-        cell_dF = np.matmul(A_.T, dF)
-
-    if A_ext.sum()>0:
-        cell_F0_ext = np.matmul(A_ext.T, F0)
-        cell_dF_ext = np.matmul(A_ext.T, dF)
+    cell_F0 = np.linalg.inv(A_.T.dot(A_)).dot(np.matmul(A_.T, F0))
+    cell_dF = np.linalg.inv(A_.T.dot(A_)).dot(np.matmul(A_.T, dF))
 
     with File(fsave, 'w') as f:
         f.create_dataset('A_loc', data=np.array([block_id[0], x_*block_id[1], y_*block_id[2]]), compression='gzip', chunks=True, shuffle=True)
-        if A_.sum()>0:
-            f.create_dataset('A', data=A_.reshape((x_, y_, -1), order="F"), compression='gzip', chunks=True, shuffle=True)
-            f.create_dataset('cell_dFF', data=cell_dF/cell_F0, compression='gzip', chunks=True, shuffle=True)
-        else:
-            f.create_dataset('A', data=np.nan)
-            f.create_dataset('cell_dFF', data=np.nan)
-
-        if A_ext.sum()>0:
-            f.create_dataset('A_ext', data=A_ext.reshape((x_, y_, -1), order="F"), compression='gzip', chunks=True, shuffle=True)
-            f.create_dataset('cell_dFF_ext', data=cell_dF_ext/cell_F0_ext, compression='gzip', chunks=True, shuffle=True)
-        else:
-            f.create_dataset('A_ext', data=np.nan)
-            f.create_dataset('cell_dFF_ext', data=np.nan)
+        f.create_dataset('A', data=A_.reshape((x_, y_, -1), order="F"), compression='gzip', chunks=True, shuffle=True)
+        f.create_dataset('cell_dFF', data=cell_dF/cell_F0, compression='gzip', chunks=True, shuffle=True)
         f.close()
     return np.zeros([1]*4)

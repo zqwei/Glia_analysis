@@ -147,12 +147,12 @@ def default_mask(dir_root, save_root, dask_tmp=None, memory_limit=0):
     Y_b_min = Y_b.min(axis=-1, keepdims=True)
     Y_b_min.to_zarr(f'{save_root}/Y_b_min.zarr', overwrite=True)
     Y_b_max = Y_b.max(axis=-1, keepdims=True)
-    Y_b_max.to_zarr(f'{save_root}/Y_b_min.zarr', overwrite=True)
-    # Y_b_max_mask = Y_b.max(axis=-1, keepdims=True)>2
-    # Y_b_min_mask = Y_b.min(axis=-1, keepdims=True)>1
-    # mask = Y_b_max_mask & Y_b_min_mask
-    # mask.to_zarr(f'{save_root}/mask_map.zarr', overwrite=True)
-    # Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+    Y_b_max.to_zarr(f'{save_root}/Y_b_max.zarr', overwrite=True)
+    Y_b_max_mask = Y_b.max(axis=-1, keepdims=True)>2
+    Y_b_min_mask = Y_b.min(axis=-1, keepdims=True)>1
+    mask = Y_b_max_mask & Y_b_min_mask
+    mask.to_zarr(f'{save_root}/mask_map.zarr', overwrite=True)
+    Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
     Y_d_max = Y_d.max(axis=-1, keepdims=True)
     Y_d_max.to_zarr(f'{save_root}/Y_d_max.zarr', overwrite=True)
     Y_max = Y.max(axis=-1, keepdims=True)
@@ -225,7 +225,7 @@ def demix_cells(save_root, dt, is_skip=True, dask_tmp=None, memory_limit=0):
     print_client_links(cluster)
     Y_svd = da.from_zarr(f'{save_root}/detrend_data.zarr')
     Y_svd = Y_svd[:, :, :, ::dt]
-    mask = da.from_zarr(f'{save_root}/Y_max.zarr')
+    mask = da.from_zarr(f'{save_root}/Y_d_max.zarr')
     if not os.path.exists(f'{save_root}/sup_demix_rlt/'):
         os.mkdir(f'{save_root}/sup_demix_rlt/')
     da.map_blocks(demix_blocks, Y_svd, mask, chunks=(1, 1, 1, 1), dtype='int8', save_folder=save_root, is_skip=is_skip).compute()
@@ -353,7 +353,7 @@ def check_demix_cells_whole_brain(save_root, nsplit = (10, 16)):
     return None
 
 
-def compute_cell_dff_raw(save_root, dask_tmp=None, memory_limit=0):
+def compute_cell_dff_raw(save_root, mask, dask_tmp=None, memory_limit=0):
     '''
       1. local pca denoise (\delta F signal)
       2. baseline
@@ -368,6 +368,7 @@ def compute_cell_dff_raw(save_root, dask_tmp=None, memory_limit=0):
     trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
     baseline_t = da.map_blocks(baseline_from_Yd, trans_data_t, Y_d, dtype='float32')
+    Y_d[~mask]=0
     if not os.path.exists(f'{save_root}/cell_raw_dff'):
         os.makedirs(f'{save_root}/cell_raw_dff')
     da.map_blocks(compute_cell_raw_dff, baseline_t, Y_d, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, ext='').compute()
