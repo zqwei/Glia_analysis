@@ -88,7 +88,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (
         # fix memory issue to load data all together for transpose on local machine
         # load data
         # swap axes
-        num_t_chunks = 40
+        num_t_chunks = 80
         splits_ = np.array_split(np.arange(num_t).astype('int'), num_t_chunks)
         print(f'Processing total {num_t_chunks} chunks in time.......')
         for nz, n_split in enumerate(splits_):
@@ -96,7 +96,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (
                 print('Apply registration to rechunk layer %03d'%(nz))
                 trans_data_ = da.map_blocks(apply_transform3d, denoised_data[n_split], trans_affine_[n_split], chunks=(1, *denoised_data.shape[1:]), dtype='float32')
                 print('Starting to rechunk layer %03d'%(nz))
-                trans_data_t_z = trans_data_[n_split].rechunk((-1, 1, chunks[1]//nsplit[0], chunks[2]//nsplit[1])).transpose((1, 2, 3, 0))
+                trans_data_t_z = trans_data_.rechunk((-1, 1, chunks[1]//nsplit[0], chunks[2]//nsplit[1])).transpose((1, 2, 3, 0))
                 trans_data_t_z.to_zarr(save_root+'/motion_corrected_data_chunks_%03d.zarr'%(nz))
                 del trans_data_t_z
                 gc.collect()

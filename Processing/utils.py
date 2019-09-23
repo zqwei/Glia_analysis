@@ -307,28 +307,10 @@ def sup_file_name_block(save_root='.', ext='', block_id=None):
     return fname+'_rlt.npz'
 
 
-# def load_sup_A_matrix(save_root='.', ext='', block_id=None, min_size=0):
-#     fname = sup_file_name_block(save_root=save_root, ext=ext, block_id=block_id)
-#     try:
-#         _ = np.load(fname, allow_pickle=True)
-#         A = _['A']
-#         A_ext = _['A_ext']
-#         return A, A_ext
-#     except:
-#         return None, None
-
-
 def load_A_matrix(save_root='.', ext='', block_id=None, min_size=40):
     fname = sup_file_name_block(save_root=save_root, ext=ext, block_id=block_id)
     _ = np.load(fname, allow_pickle=True)
     return _['A']
-    # with open(fname, 'rb') as f:
-    #     try:
-    #         rlt_ = pickle.load(f)
-    #         A = rlt_['fin_rlt']['a']
-    #         return A[:, (A>0).sum(axis=0)>min_size]
-    #     except:
-    #         return None
 
 
 def pos_sig_correction(mov, dt, axis_=-1):
