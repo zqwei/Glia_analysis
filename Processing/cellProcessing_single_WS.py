@@ -85,24 +85,17 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (
 
     # apply affine transform
     if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
-        print('Apply registration ---')
-        if not os.path.exists(f'{save_root}/motion_corrected_data_tmp.zarr'):
-            trans_data_ = da.map_blocks(apply_transform3d, denoised_data, trans_affine_, chunks=(1, *denoised_data.shape[1:]), dtype='float32')
-            trans_data_.to_zarr(f'{save_root}/motion_corrected_data_tmp.zarr')
-            del trans_data_
-            if os.path.exists(f'{save_root}/denoised_data.zarr'):
-                shutil.rmtree(f'{save_root}/denoised_data.zarr')
-
         # fix memory issue to load data all together for transpose on local machine
         # load data
-        trans_data_ = da.from_zarr(f'{save_root}/motion_corrected_data_tmp.zarr')
         # swap axes
-        num_t_chunks = 10
+        num_t_chunks = 40
         splits_ = np.array_split(np.arange(num_t).astype('int'), num_t_chunks)
         print(f'Processing total {num_t_chunks} chunks in time.......')
         for nz, n_split in enumerate(splits_):
             if not os.path.exists(save_root+'/motion_corrected_data_layer_%03d.zarr'%(nz)):
-                print('starting to rechunk layer %03d'%(nz))
+                print('Apply registration to rechunk layer %03d'%(nz))
+                trans_data_ = da.map_blocks(apply_transform3d, denoised_data[n_split], trans_affine_[n_split], chunks=(1, *denoised_data.shape[1:]), dtype='float32')
+                print('Starting to rechunk layer %03d'%(nz))
                 trans_data_t_z = trans_data_[n_split].rechunk((-1, 1, chunks[1]//nsplit[0], chunks[2]//nsplit[1])).transpose((1, 2, 3, 0))
                 trans_data_t_z.to_zarr(save_root+'/motion_corrected_data_chunks_%03d.zarr'%(nz))
                 del trans_data_t_z
@@ -110,8 +103,8 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (
                 print('finishing rechunking time chunk -- %03d of %03d'%(nz, num_t_chunks))
 
         print('Remove temporal files of registration')
-        if os.path.exists(f'{save_root}/motion_corrected_data_tmp.zarr'):
-            shutil.rmtree(f'{save_root}/motion_corrected_data_tmp.zarr')
+        if os.path.exists(f'{save_root}/denoised_data.zarr'):
+            shutil.rmtree(f'{save_root}/denoised_data.zarr')
 
 
         trans_data_t = da.concatenate([da.from_zarr(save_root+'/motion_corrected_data_chunks_%03d.zarr'%(nz)) for nz in range(num_t_chunks)], axis=-1)
@@ -178,42 +171,6 @@ def local_pca_on_mask(save_root, is_dff=False, dask_tmp=None, memory_limit=0):
     fdask.terminate_workers(cluster, client)
     time.sleep(10)
     return None
-
-
-# def demix_cells(save_root, dt, params=None, is_skip=True, dask_tmp=None, memory_limit=0):
-#     '''
-#       1. local pca denoise
-#       2. cell segmentation
-#     '''
-#     cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
-#     print_client_links(cluster)
-#     Y_svd = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
-#     Y_svd = Y_svd[:, :, :, ::dt]
-#     mask = da.from_zarr(f'{save_root}/mask_map.zarr')
-#     if not os.path.exists(f'{save_root}/demix_rlt/'):
-#         os.mkdir(f'{save_root}/demix_rlt/')
-#     da.map_blocks(demix_blocks, Y_svd, mask, chunks=(1, 1, 1, 1), dtype='int8', save_folder=save_root, is_skip=is_skip, params=params).compute()
-#     fdask.terminate_workers(cluster, client)
-#     time.sleep(10)
-#     return None
-
-
-# def sup_cells(save_root, dt, is_skip=True, dask_tmp=None, memory_limit=0):
-#     '''
-#       1. local pca denoise
-#       2. cell segmentation
-#     '''
-#     cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
-#     print_client_links(cluster)
-#     Y_svd = da.from_zarr(f'{save_root}/masked_local_pca_data.zarr')
-#     Y_svd = Y_svd[:, :, :, ::dt]
-#     mask = da.from_zarr(f'{save_root}/mask_map.zarr')
-#     if not os.path.exists(f'{save_root}/sup_demix_rlt/'):
-#         os.mkdir(f'{save_root}/sup_demix_rlt/')
-#     da.map_blocks(sup_blocks, Y_svd, mask, chunks=(1, 1, 1, 1), dtype='int8', save_folder=save_root, is_skip=is_skip).compute()
-#     fdask.terminate_workers(cluster, client)
-#     time.sleep(10)
-#     return None
 
 
 def demix_cells(save_root, dt, is_skip=True, dask_tmp=None, memory_limit=0):
