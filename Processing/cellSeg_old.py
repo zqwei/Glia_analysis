@@ -27,6 +27,7 @@ if not os.path.exists(save_root):
 nsplit = (16, 32)
 baseline_percentile = 20
 baseline_window = 1000   # number of frames
+num_t_chunks = 80
 cameraNoiseMat = '/nrs/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
 
 if not os.path.exists(save_root):
@@ -36,7 +37,7 @@ if not os.path.exists(save_root):
 print('========================')
 print('Preprocessing')
 if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
-    preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit=nsplit, dask_tmp=dask_tmp, memory_limit=memory_limit, is_bz2=False)
+    preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit=nsplit, num_t_chunks=num_t_chunks, dask_tmp=dask_tmp, memory_limit=memory_limit, is_bz2=False)
 
 if not os.path.exists(f'{save_root}/detrend_data.zarr'):
     detrend_data(dir_root, save_root, window=baseline_window, percentile=baseline_percentile, nsplit=nsplit, dask_tmp=dask_tmp, memory_limit=memory_limit)
@@ -69,12 +70,12 @@ is_skip = True
 demix_cells(save_root, dt, is_skip=is_skip, dask_tmp=dask_tmp, memory_limit=memory_limit)
 
 
-# Y_d = da.from_zarr(f'{save_root}/Y_ave.zarr')
-# Y_d_max = Y_d.max(axis=0).compute()
-# max_ = np.percentile(Y_d_max, 45)
-# mask_ = Y_d_max>max_
-# mask_ = da.from_array(mask_[np.newaxis,:], chunks=Y_d.chunksize)
+Y_d = da.from_zarr(f'{save_root}/Y_ave.zarr')
+Y_d_max = Y_d.max(axis=0).compute()
+max_ = np.percentile(Y_d_max, 45)
+mask_ = Y_d_max>max_
+mask_ = da.from_array(mask_[np.newaxis,:], chunks=Y_d.chunksize)
 
-# print('========================')
-# print('DF/F computation')
-# compute_cell_dff_raw(save_root, mask_, dask_tmp=dask_tmp, memory_limit=0)
+print('========================')
+print('DF/F computation')
+compute_cell_dff_raw(save_root, mask_, dask_tmp=dask_tmp, memory_limit=0)

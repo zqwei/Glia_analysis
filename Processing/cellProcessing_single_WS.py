@@ -18,7 +18,7 @@ def print_client_links(cluster):
     return None
 
 
-def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (4, 4),\
+def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (4, 4), num_t_chunks = 80,\
                   dask_tmp=None, memory_limit=0, is_bz2=False):
     # set worker
     cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
@@ -88,7 +88,6 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (
         # fix memory issue to load data all together for transpose on local machine
         # load data
         # swap axes
-        num_t_chunks = 80
         splits_ = np.array_split(np.arange(num_t).astype('int'), num_t_chunks)
         print(f'Processing total {num_t_chunks} chunks in time.......')
         for nz, n_split in enumerate(splits_):
