@@ -11,8 +11,12 @@ import matplotlib.pyplot as plt
 # dir_root = '/nrs/ahrens/jing/giving_up/20190430/fish01/6dpf_HuC-GCaMP7ff-GFAP-RGECO_GU-slow-fwd_fish01_exp01_20190430_174349/im'
 # save_root = '/nrs/ahrens/Ziqiang/Jing_Glia_project/Processed_data/20190430/fish01/6dpf_HuC-GCaMP7ff-GFAP-RGECO_GU-slow-fwd_fish01_exp01_20190430_174349/'
 
-dir_root = '/nrs/ahrens/jing/giving_up/20190426/fish03/7dpf_HuC-H2B_GCaMP7ff_GU-slow-fwd_fish03_exp02_20190426_221213/im'
-save_root = '/nrs/ahrens/Ziqiang/Jing_Glia_project/Processed_data/20190426/fish03/7dpf_HuC-H2B_GCaMP7ff_GU-slow-fwd_fish03_exp02_20190426_221213/'
+# dir_root = '/nrs/ahrens/jing/giving_up/20190426/fish03/7dpf_HuC-H2B_GCaMP7ff_GU-slow-fwd_fish03_exp02_20190426_221213/im'
+# save_root = '/nrs/ahrens/Ziqiang/Jing_Glia_project/Processed_data/20190426/fish03/7dpf_HuC-H2B_GCaMP7ff_GU-slow-fwd_fish03_exp02_20190426_221213/'
+
+dir_root = '/nrs/ahrens/jing/giving_up/20190907/fish00/7dpf_HuC-GC7FF_GU-fwd_fish00_exp01_20190907_172639/im'
+save_root = '/nrs/ahrens/Ziqiang/Jing_Glia_project/Processed_data/20190907/fish00/7dpf_HuC-GC7FF_GU-fwd_fish00_exp01_20190907_172639/'
+
 
 dask_tmp = '/opt/data/weiz/dask-worker-space'
 memory_limit = 0 # unlimited
@@ -57,12 +61,20 @@ if False:
         plt.show()
     fdask.terminate_workers(cluster, client)
 
-
+    
 print('========================')
 print('Demix')
 dt = 3
-is_skip = False
+is_skip = True
 demix_cells(save_root, dt, is_skip=is_skip, dask_tmp=dask_tmp, memory_limit=memory_limit)
 
-print('========================')
-print('DF/F computation')
+
+# Y_d = da.from_zarr(f'{save_root}/Y_ave.zarr')
+# Y_d_max = Y_d.max(axis=0).compute()
+# max_ = np.percentile(Y_d_max, 45)
+# mask_ = Y_d_max>max_
+# mask_ = da.from_array(mask_[np.newaxis,:], chunks=Y_d.chunksize)
+
+# print('========================')
+# print('DF/F computation')
+# compute_cell_dff_raw(save_root, mask_, dask_tmp=dask_tmp, memory_limit=0)
