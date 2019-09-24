@@ -317,13 +317,41 @@ def pos_sig_correction(mov, dt, axis_=-1):
     return mov - (mov[:, :, dt]).min(axis=axis_, keepdims=True)
 
 
-def compute_cell_raw_dff(block_F0, block_dF, save_root='.', ext='', block_id=None):
-    from fish_proc.utils.demix import recompute_C_matrix
-    _, x_, y_, _ = block_F0.shape
+# def compute_cell_raw_dff(block_F0, block_dF, save_root='.', ext='', block_id=None):
+#     from fish_proc.utils.demix import recompute_C_matrix
+#     _, x_, y_, _ = block_F0.shape
+#     A_= load_A_matrix(save_root=save_root, ext=ext, block_id=block_id, min_size=0)
+#     if A_.sum()==0:
+#         return np.zeros([1]*4) # return if no components
+#     if np.abs(block_dF).sum()==0:
+#         return np.zeros([1]*4) # return if out of brain
+    
+#     fsave = f'{save_root}/cell_raw_dff/period_Y_demix_block_'
+#     for _ in block_id:
+#         fsave += '_'+str(_)
+#     fsave += '_rlt.h5'
+    
+#     F0 = block_F0.squeeze(axis=0).reshape((x_*y_, -1), order='F')
+#     dF = block_dF.squeeze(axis=0).reshape((x_*y_, -1), order='F')
+#     cell_F0 = np.linalg.inv(A_.T.dot(A_)).dot(np.matmul(A_.T, F0))
+#     cell_dF = np.linalg.inv(A_.T.dot(A_)).dot(np.matmul(A_.T, dF))
+    
+#     with File(fsave, 'w') as f:
+#         f.create_dataset('A_loc', data=np.array([block_id[0], x_*block_id[1], y_*block_id[2]]))
+#         f.create_dataset('A', data=A_.reshape((x_, y_, -1), order="F"))
+#         f.create_dataset('cell_dFF', data=cell_dF/cell_F0)
+#         f.close()
+#     return np.zeros([1]*4)
+
+
+def compute_cell_raw_dff(block_F, mask, save_root='.', ext='', block_id=None):
+    _, x_, y_, _ = block_F.shape
     A_= load_A_matrix(save_root=save_root, ext=ext, block_id=block_id, min_size=0)
+    
     if A_.sum()==0:
         return np.zeros([1]*4) # return if no components
-    if np.abs(block_dF).sum()==0:
+    
+    if mask.sum()==0:
         return np.zeros([1]*4) # return if out of brain
     
     fsave = f'{save_root}/cell_raw_dff/period_Y_demix_block_'
@@ -331,14 +359,30 @@ def compute_cell_raw_dff(block_F0, block_dF, save_root='.', ext='', block_id=Non
         fsave += '_'+str(_)
     fsave += '_rlt.h5'
     
-    F0 = block_F0.squeeze(axis=0).reshape((x_*y_, -1), order='F')
-    dF = block_dF.squeeze(axis=0).reshape((x_*y_, -1), order='F')
-    cell_F0 = np.linalg.inv(A_.T.dot(A_)).dot(np.matmul(A_.T, F0))
-    cell_dF = np.linalg.inv(A_.T.dot(A_)).dot(np.matmul(A_.T, dF))
+    A_ = A_[:, A_.sum(axis=0)>0] # remove zero-components
+    F_ = block_F.squeeze(axis=0).reshape((x_*y_, -1), order='F')
+    cell_F = np.linalg.inv(A_.T.dot(A_)).dot(np.matmul(A_.T, F_)) #demix from inversion
+
+    A_[A_<A_.max(axis=0, keepdims=True)*0.3]=0
+    A_ = A_.reshape((x_, y_, -1), order="F")
+    
+    mask_ = mask.squeeze()
+    A_sparse = A_.copy()
+    A_sparse[~mask_]=0
+    A_sparse = A_sparse[:, :, (A_sparse>0).sum(axis=(0,1))>10]
+    F_sparse = block_F.squeeze(axis=0)
+    F_sparse[~mask]=0
+    F_sparse = F_sparse.reshape((x_*y_, -1), order='F')
+    A__ = A_sparse.copy()
+    A__ = A__.reshape((x_*y_, -1), order='F')
+    cell_F_sparse = np.linalg.inv(A__.T.dot(A__)).dot(np.matmul(A__.T, F_sparse))
+    
     
     with File(fsave, 'w') as f:
         f.create_dataset('A_loc', data=np.array([block_id[0], x_*block_id[1], y_*block_id[2]]))
-        f.create_dataset('A', data=A_.reshape((x_, y_, -1), order="F"))
-        f.create_dataset('cell_dFF', data=cell_dF/cell_F0)
+        f.create_dataset('A', data=A_)
+        f.create_dataset('cell_F', data=cell_F)
+        f.create_dataset('A_s', data=A_sparse)
+        f.create_dataset('cell_F_s', data=cell_F_sparse)
         f.close()
     return np.zeros([1]*4)
