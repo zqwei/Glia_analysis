@@ -47,22 +47,7 @@ print('========================')
 print('Mask')
 default_mask(dir_root, save_root, dask_tmp=dask_tmp, memory_limit=memory_limit)
 
-if False:
-    print('========================')
-    print('Plot masks')
-    cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
-    print_client_links(cluster)
-    Y_d = zarr.open(f'{save_root}/Y_max.zarr', 'r')
-    mask = zarr.open(f'{save_root}/mask_map.zarr', 'r')
-    for n, n_ave_ in enumerate(Y_d):
-        _ = n_ave_.squeeze().copy()
-        _[~mask[n].squeeze()] = 0
-        plt.imshow(_, vmax=np.percentile(_, 99))
-        plt.title(n)
-        plt.show()
-    fdask.terminate_workers(cluster, client)
 
-    
 print('========================')
 print('Demix')
 dt = 3
