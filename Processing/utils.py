@@ -320,28 +320,25 @@ def pos_sig_correction(mov, dt, axis_=-1):
 def compute_cell_raw_dff(block_F0, block_dF, save_root='.', ext='', block_id=None):
     from fish_proc.utils.demix import recompute_C_matrix
     _, x_, y_, _ = block_F0.shape
-    try:
-        A_= load_A_matrix(save_root=save_root, ext=ext, block_id=block_id, min_size=0)
-    except:
-        print(block_id)
+    A_= load_A_matrix(save_root=save_root, ext=ext, block_id=block_id, min_size=0)
     if A_.sum()==0:
         return np.zeros([1]*4) # return if no components
     if np.abs(block_dF).sum()==0:
         return np.zeros([1]*4) # return if out of brain
-
+    
     fsave = f'{save_root}/cell_raw_dff/period_Y_demix_block_'
     for _ in block_id:
         fsave += '_'+str(_)
     fsave += '_rlt.h5'
-
+    
     F0 = block_F0.squeeze(axis=0).reshape((x_*y_, -1), order='F')
     dF = block_dF.squeeze(axis=0).reshape((x_*y_, -1), order='F')
     cell_F0 = np.linalg.inv(A_.T.dot(A_)).dot(np.matmul(A_.T, F0))
     cell_dF = np.linalg.inv(A_.T.dot(A_)).dot(np.matmul(A_.T, dF))
-
+    
     with File(fsave, 'w') as f:
-        f.create_dataset('A_loc', data=np.array([block_id[0], x_*block_id[1], y_*block_id[2]]), compression='gzip', chunks=True, shuffle=True)
-        f.create_dataset('A', data=A_.reshape((x_, y_, -1), order="F"), compression='gzip', chunks=True, shuffle=True)
-        f.create_dataset('cell_dFF', data=cell_dF/cell_F0, compression='gzip', chunks=True, shuffle=True)
+        f.create_dataset('A_loc', data=np.array([block_id[0], x_*block_id[1], y_*block_id[2]]))
+        f.create_dataset('A', data=A_.reshape((x_, y_, -1), order="F"))
+        f.create_dataset('cell_dFF', data=cell_dF/cell_F0)
         f.close()
     return np.zeros([1]*4)
