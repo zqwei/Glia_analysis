@@ -134,25 +134,25 @@ def default_mask(dir_root, save_root, dask_tmp=None, memory_limit=0):
     print_client_links(cluster)
     print('Compute default mask ---')
     Y = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
-    Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
-    Y_b = Y - Y_d
-    Y_b_min = Y_b.min(axis=-1, keepdims=True)
-    Y_b_min.to_zarr(f'{save_root}/Y_b_min.zarr', overwrite=True)
-    Y_b_max = Y_b.max(axis=-1, keepdims=True)
-    Y_b_max.to_zarr(f'{save_root}/Y_b_max.zarr', overwrite=True)
-    Y_b_max_mask = Y_b.max(axis=-1, keepdims=True)>2
-    Y_b_min_mask = Y_b.min(axis=-1, keepdims=True)>1
-    mask = Y_b_max_mask & Y_b_min_mask
-    mask.to_zarr(f'{save_root}/mask_map.zarr', overwrite=True)
-    Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
-    Y_d_max = Y_d.max(axis=-1, keepdims=True)
-    Y_d_max.to_zarr(f'{save_root}/Y_d_max.zarr', overwrite=True)
-    Y_max = Y.max(axis=-1, keepdims=True)
-    Y_max.to_zarr(f'{save_root}/Y_max.zarr', overwrite=True)
+#     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+#     Y_b = Y - Y_d
+#     Y_b_min = Y_b.min(axis=-1, keepdims=True)
+#     Y_b_min.to_zarr(f'{save_root}/Y_b_min.zarr', overwrite=True)
+#     Y_b_max = Y_b.max(axis=-1, keepdims=True)
+#     Y_b_max.to_zarr(f'{save_root}/Y_b_max.zarr', overwrite=True)
+#     Y_b_max_mask = Y_b.max(axis=-1, keepdims=True)>2
+#     Y_b_min_mask = Y_b.min(axis=-1, keepdims=True)>1
+#     mask = Y_b_max_mask & Y_b_min_mask
+#     mask.to_zarr(f'{save_root}/mask_map.zarr', overwrite=True)
+#     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+#     Y_d_max = Y_d.max(axis=-1, keepdims=True)
+#     Y_d_max.to_zarr(f'{save_root}/Y_d_max.zarr', overwrite=True)
+#     Y_max = Y.max(axis=-1, keepdims=True)
+#     Y_max.to_zarr(f'{save_root}/Y_max.zarr', overwrite=True)
     Y_ave = Y.mean(axis=-1, keepdims=True)
     Y_ave.to_zarr(f'{save_root}/Y_ave.zarr', overwrite=True)
-    Y_std = Y.std(axis=-1, keepdims=True)
-    Y_std.to_zarr(f'{save_root}/Y_std.zarr', overwrite=True)
+#     Y_std = Y.std(axis=-1, keepdims=True)
+#     Y_std.to_zarr(f'{save_root}/Y_std.zarr', overwrite=True)
     fdask.terminate_workers(cluster, client)
     return None
 
@@ -329,4 +329,38 @@ def compute_cell_dff_raw(save_root, mask, dask_tmp=None, memory_limit=0):
         os.makedirs(f'{save_root}/cell_raw_dff')
     da.map_blocks(compute_cell_raw_dff, baseline_t, Y_d, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, ext='').compute()
     fdask.terminate_workers(cluster, client)
+    return None
+
+
+def combine_dff(save_root):
+    '''
+      1. local pca denoise (\delta F signal)
+      2. baseline
+      3. Cell weight matrix apply to denoise and baseline
+      4. dff
+    '''
+    # set worker
+    A_loc_list = []
+    A_list = []
+    dFF_list = []
+    A_shape = []
+    for _ in glob(save_root+'cell_raw_dff/period_Y_demix_block_*.h5'):
+        try:
+            _ = File(_)
+        except:
+            continue
+        A_loc = _['A_loc'].value
+        A = _['A'].value
+        dFF = _['cell_dFF'].value
+        for n_ in range(A.shape[-1]):
+            if np.abs(dFF[n_]).sum()>0:
+                A_tmp = np.zeros((100, 100))
+                A_loc_list.append(A_loc)
+                x_, y_ = A[:, :, n_].shape
+                A_shape.append(np.array([x_, y_]))
+                A_tmp[:x_, :y_] = A[:, :, n_]
+                A_list.append(A_tmp)
+                dFF_list.append(dFF[n_])
+    np.savez(save_root+'cell_raw_dff', A_loc=np.array(A_loc_list), A_shape=np.array(A_shape), \
+             A=np.array(A_list), dFF=np.array(dFF_list))
     return None
