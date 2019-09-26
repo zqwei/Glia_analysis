@@ -17,9 +17,8 @@ def pixelDenoiseImag(img, cameraNoiseMat='', cameraInfo=None):
     offset_ = offset[pixel_x[0]:pixel_x[1], pixel_y[0]:pixel_y[1]]
     gain_ = gain[pixel_x[0]:pixel_x[1], pixel_y[0]:pixel_y[1]]
     if img.ndim == 3:
-        filter_win = (1, win_, win_)
-    if img.ndim == 4:
-        filter_win = (1, 1, win_, win_)
+        img = np.expand_dims(img, axis=1) # insert z dim here
+    filter_win = (1, 1, win_, win_)
     return median_filter(simpleDN(img, offset=offset_, gain=gain_), size=filter_win)
 
 

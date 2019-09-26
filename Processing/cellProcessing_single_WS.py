@@ -19,7 +19,7 @@ def print_client_links(cluster):
 
 
 def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (4, 4), num_t_chunks = 80,\
-                  dask_tmp=None, memory_limit=0, is_bz2=False):
+                  dask_tmp=None, memory_limit=0, is_bz2=False, is_singlePlane=False):
     # set worker
     cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
     print_client_links(cluster)
@@ -28,7 +28,13 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (
         if not is_bz2:
             files = sorted(glob(dir_root+'/*.h5'))
             chunks = File(files[0],'r')['default'].shape
-            data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
+            if not is_singlePlane: 
+                data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
+            else:
+                if len(chunks)==2:
+                    data = da.stack([da.from_array(File(fn,'r')['default'], chunks=chunks) for fn in files])
+                else:
+                    data = da.concatenate([da.from_array(File(fn,'r')['default'], chunks=(1, chunks[1], chunks[2])) for fn in files], axis=0)
             cameraInfo = getCameraInfo(dir_root)
         else:
             import dask
@@ -53,7 +59,10 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (
             cameraInfo['camera_roi'] = '%d_%d_%d_%d'%(pixel_x0, pixel_x1, pixel_y0, pixel_y1)
             chunks = sample.shape
         # pixel denoise
-        denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraNoiseMat=cameraNoiseMat, cameraInfo=cameraInfo))
+        if not is_singlePlane: 
+            denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraNoiseMat=cameraNoiseMat, cameraInfo=cameraInfo))
+        else:
+            denoised_data = data.map_blocks(lambda v: pixelDenoiseImag(v, cameraNoiseMat=cameraNoiseMat, cameraInfo=cameraInfo), new_axis=1)
         denoised_data.to_zarr(f'{save_root}/denoised_data.zarr')
         num_t = denoised_data.shape[0]
     else:
