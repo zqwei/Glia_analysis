@@ -369,20 +369,23 @@ def compute_cell_raw_dff(block_F, mask, save_root='.', ext='', block_id=None):
     mask_ = mask.squeeze()
     A_sparse = A_.copy()
     A_sparse[~mask_]=0
-    A_sparse = A_sparse[:, :, (A_sparse>0).sum(axis=(0,1))>10]
-    F_sparse = block_F.squeeze(axis=0)
-    F_sparse[~mask]=0
-    F_sparse = F_sparse.reshape((x_*y_, -1), order='F')
-    A__ = A_sparse.copy()
-    A__ = A__.reshape((x_*y_, -1), order='F')
-    cell_F_sparse = np.linalg.inv(A__.T.dot(A__)).dot(np.matmul(A__.T, F_sparse))
+    valid = (A_sparse>0).sum(axis=(0,1))>10
+    if valid.sum()>0:
+        A_sparse = A_sparse[:, :, (A_sparse>0).sum(axis=(0,1))>10]
+        F_sparse = block_F.squeeze(axis=0)
+        F_sparse[~mask_]=0
+        F_sparse = F_sparse.reshape((x_*y_, -1), order='F')
+        A__ = A_sparse.copy()
+        A__ = A__.reshape((x_*y_, -1), order='F')
+        cell_F_sparse = np.linalg.inv(A__.T.dot(A__)).dot(np.matmul(A__.T, F_sparse))
     
     
     with File(fsave, 'w') as f:
         f.create_dataset('A_loc', data=np.array([block_id[0], x_*block_id[1], y_*block_id[2]]))
         f.create_dataset('A', data=A_)
         f.create_dataset('cell_F', data=cell_F)
-        f.create_dataset('A_s', data=A_sparse)
-        f.create_dataset('cell_F_s', data=cell_F_sparse)
+        if valid.sum()>0:
+            f.create_dataset('A_s', data=A_sparse)
+            f.create_dataset('cell_F_s', data=cell_F_sparse)
         f.close()
     return np.zeros([1]*4)
