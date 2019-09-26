@@ -6,7 +6,6 @@ warnings.filterwarnings('ignore')
 from cellProcessing_single_WS import *
 import dask.array as da
 import numpy as np
-import matplotlib.pyplot as plt
 
 # dir_root = '/nrs/ahrens/jing/giving_up/20190430/fish01/6dpf_HuC-GCaMP7ff-GFAP-RGECO_GU-slow-fwd_fish01_exp01_20190430_174349/im'
 # save_root = '/nrs/ahrens/Ziqiang/Jing_Glia_project/Processed_data/20190430/fish01/6dpf_HuC-GCaMP7ff-GFAP-RGECO_GU-slow-fwd_fish01_exp01_20190430_174349/'
