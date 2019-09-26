@@ -111,6 +111,7 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (
         trans_data_t.to_zarr(f'{save_root}/motion_corrected_data.zarr')
         for nz in range(num_t_chunks):
             if os.path.exists(f'{save_root}/motion_corrected_data_chunks_%03d.zarr'%(nz)):
+                print('Remove temporal files of registration at %03d'%(nz))
                 shutil.rmtree(f'{save_root}/motion_corrected_data_chunks_%03d.zarr'%(nz))
     fdask.terminate_workers(cluster, client)
     return None
@@ -134,8 +135,24 @@ def default_mask(dir_root, save_root, dask_tmp=None, memory_limit=0):
     print_client_links(cluster)
     print('Compute default mask ---')
     Y = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
+    Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
+#     Y_b = Y - Y_d
+#     Y_b_min = Y_b.min(axis=-1, keepdims=True)
+#     Y_b_min.to_zarr(f'{save_root}/Y_b_min.zarr', overwrite=True)
+#     Y_b_max = Y_b.max(axis=-1, keepdims=True)
+#     Y_b_max.to_zarr(f'{save_root}/Y_b_max.zarr', overwrite=True)
+#     Y_b_max_mask = Y_b.max(axis=-1, keepdims=True)>2
+#     Y_b_min_mask = Y_b.min(axis=-1, keepdims=True)>1
+#     mask = Y_b_max_mask & Y_b_min_mask
+#     mask.to_zarr(f'{save_root}/mask_map.zarr', overwrite=True)
+    Y_d_max = Y_d.max(axis=-1, keepdims=True)
+    Y_d_max.to_zarr(f'{save_root}/Y_d_max.zarr', overwrite=True)
+    Y_max = Y.max(axis=-1, keepdims=True)
+    Y_max.to_zarr(f'{save_root}/Y_max.zarr', overwrite=True)
     Y_ave = Y.mean(axis=-1, keepdims=True)
     Y_ave.to_zarr(f'{save_root}/Y_ave.zarr', overwrite=True)
+#     Y_std = Y.std(axis=-1, keepdims=True)
+#     Y_std.to_zarr(f'{save_root}/Y_std.zarr', overwrite=True)
     fdask.terminate_workers(cluster, client)
     return None
 
@@ -237,10 +254,6 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True, mas
         A_[~mask_]=0
         A_ = A_[:, :, (A_>0).sum(axis=(0,1))>10]
         A_ = A_.reshape(x_*y_, -1, order="F")
-        print(np.linalg.eig(A_.T.dot(A_)))
-#         for n in range(A_.shape[-1]):
-#             n_max = A_[:, n].max()
-#             A_[A_[:,n]<n_max*0.2, n] = 0
         A_comp = np.zeros(A_.shape[0])
         A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + 1
         A_comp[A_comp>0] = A_comp[A_comp>0]%20+1
@@ -434,7 +447,7 @@ def combine_dff(save_root):
             continue
         A_loc = _['A_loc'].value
         A = _['A'].value
-        dFF = _['cell_dFF'].value
+        dFF = _['cell_F'].value
         for n_ in range(A.shape[-1]):
             if np.abs(dFF[n_]).sum()>0:
                 A_tmp = np.zeros((100, 100))
@@ -445,5 +458,42 @@ def combine_dff(save_root):
                 A_list.append(A_tmp)
                 dFF_list.append(dFF[n_])
     np.savez(save_root+'cell_raw_dff', A_loc=np.array(A_loc_list), A_shape=np.array(A_shape), \
-             A=np.array(A_list), dFF=np.array(dFF_list))
+             A=np.array(A_list), F=np.array(dFF_list))
+    return None
+
+
+def combine_dff_sparse(save_root):
+    '''
+      1. local pca denoise (\delta F signal)
+      2. baseline
+      3. Cell weight matrix apply to denoise and baseline
+      4. dff
+    '''
+    # set worker
+    A_loc_list = []
+    A_list = []
+    dFF_list = []
+    A_shape = []
+    for _ in glob(save_root+'cell_raw_dff/period_Y_demix_block_*.h5'):
+        try:
+            _ = File(_)
+        except:
+            continue
+        A_loc = _['A_loc'].value
+        try:
+            A = _['A_s'].value
+            dFF = _['cell_F_s'].value
+            for n_ in range(A.shape[-1]):
+                if np.abs(dFF[n_]).sum()>0:
+                    A_tmp = np.zeros((100, 100))
+                    A_loc_list.append(A_loc)
+                    x_, y_ = A[:, :, n_].shape
+                    A_shape.append(np.array([x_, y_]))
+                    A_tmp[:x_, :y_] = A[:, :, n_]
+                    A_list.append(A_tmp)
+                    dFF_list.append(dFF[n_])
+        except:
+            pass
+    np.savez(save_root+'cell_raw_dff_sparse', A_loc=np.array(A_loc_list), A_shape=np.array(A_shape), \
+             A=np.array(A_list), F=np.array(dFF_list))
     return None
