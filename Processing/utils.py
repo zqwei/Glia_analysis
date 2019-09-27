@@ -67,7 +67,7 @@ def estimate_rigid2d(moving, fixed=None, affs=None, to3=True):
     trans.factors = [8, 4, 2]
     trans.sigmas = [3.0, 2.0, 1.0]
     trans.ss_sigma_factor = 1.0
-    affs = trans.estimate_rigid2d(fixed.max(0), moving.squeeze().max(0), tx_tr=affs).affine
+    affs = trans.estimate_rigid2d(fixed.max(0), moving.squeeze(axis=0).max(0), tx_tr=affs).affine
     if to3:
         _ = np.eye(4)
         _[1:, 1:] = affs
