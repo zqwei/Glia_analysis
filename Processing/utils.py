@@ -30,35 +30,6 @@ def load_bz2file(file, dims):
     return im.reshape(dims[-1::-1])
 
 
-def estimate_rigid3d(moving, fixed=None, affs=None):
-    from fish_proc.imageRegistration.imTrans import ImAffine
-    from numpy import expand_dims
-    trans = ImAffine()
-    trans.level_iters = [1000, 1000, 100]
-    trans.ss_sigma_factor = 1.0
-    affs = trans.estimate_rigid3d(fixed, moving.squeeze(), tx_tr=affs).affine
-    return expand_dims(affs, 0)
-
-
-def estimate_rigid3d_affine(moving, fixed=None, affs=None):
-    from fish_proc.imageRegistration.imTrans import ImAffine
-    from numpy import expand_dims
-    trans = ImAffine()
-    trans.level_iters = [1000, 1000, 100]
-    trans.ss_sigma_factor = 1.0
-    return trans.estimate_rigid3d(fixed, moving.squeeze(), tx_tr=affs)
-
-
-def estimate_translation3d(moving, fixed=None):
-    from fish_proc.imageRegistration.imTrans import ImAffine
-    from numpy import expand_dims
-    trans = ImAffine()
-    trans.level_iters = [1000, 1000, 100]
-    trans.ss_sigma_factor = 1.0
-    affs = trans.estimate_translation3d(fixed, moving.squeeze()).affine
-    return expand_dims(affs, 0)
-
-
 def estimate_rigid2d(moving, fixed=None, affs=None, to3=True):
     from fish_proc.imageRegistration.imTrans import ImAffine
     from numpy import expand_dims
@@ -93,7 +64,7 @@ def estimate_translation2d(moving, fixed=None, to3=True):
 
 def apply_transform3d(mov, affs):
     from scipy.ndimage.interpolation import affine_transform
-    return np.expand_dims(affine_transform(mov.squeeze(), affs.squeeze()), 0)
+    return np.expand_dims(affine_transform(mov.squeeze(axis=0), affs.squeeze(axis=0)), 0)
 
 
 def save_h5(filename, data, dtype='float32'):
