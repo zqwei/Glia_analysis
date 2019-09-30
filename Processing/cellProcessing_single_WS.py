@@ -211,49 +211,6 @@ def check_fail_block(save_root, dt=0):
     print(file)
 
 
-# def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True):
-#     import matplotlib.pyplot as plt
-#     Y_d_ave = da.from_zarr(f'{save_root}/Y_max.zarr')
-#     mask = da.from_zarr(f'{save_root}/mask_map.zarr')
-#     Y_d_ave_ = Y_d_ave.blocks[block_id].squeeze().compute(scheduler='threads')
-#     mask_ = mask.blocks[block_id].squeeze().compute(scheduler='threads')
-#     v_max = np.percentile(Y_d_ave_, 99)
-#     _, xdim, ydim, _ = Y_d_ave.shape
-#     _, x_, y_, _ = Y_d_ave.chunksize
-#     try:
-#         A_ = load_A_matrix(save_root=save_root, block_id=block_id, min_size=0)
-#         A_[A_<A_.max()*0] = 0
-#         for n in range(A_.shape[-1]):
-#             n_max = A_[:, n].max()
-#             A_[A_[:,n]<n_max*0.2, n] = 0
-#         A_comp = np.zeros(A_.shape[0])
-#         A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + 1
-#         A_comp[A_comp>0] = A_comp[A_comp>0]%20+1
-#         plt.figure(figsize=(8, 8))
-#         plt.imshow(Y_d_ave_, vmax=v_max, cmap='gray')
-#         plt.imshow(A_comp.reshape(y_, x_).T, cmap=plt.cm.nipy_spectral_r, alpha=0.4)
-#         plt.title('Components')
-#         plt.axis('off')
-#         plt.show()
-#         plt.figure(figsize=(8, 8))
-#         plt.title('Weights')
-#         A_comp = A_.sum(axis=-1)
-#         plt.imshow(A_comp.reshape(y_, x_).T)
-#         plt.axis('off')
-#         plt.show()
-#     except:
-#         print('No components')
-#     if plot_global:
-#         area_mask = np.zeros((xdim, ydim)).astype('bool')
-#         area_mask[block_id[1]*x_:block_id[1]*x_+x_, block_id[2]*y_:block_id[2]*y_+y_]=True
-#         plt.figure(figsize=(16, 16))
-#         plt.imshow(Y_d_ave[block_id[0]].squeeze().compute(scheduler='threads'), vmax=v_max)
-#         plt.imshow(area_mask, cmap='gray', alpha=0.3)
-#         plt.axis('off')
-#         plt.show()
-#     return None
-
-
 def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True, mask=None):
     import matplotlib.pyplot as plt
     Y_d_ave = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
@@ -263,7 +220,6 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True, mas
     Y_d_ave_ = Y_d_ave_[block_id[0],block_id[1]*x_:block_id[1]*x_+x_, block_id[2]*y_:block_id[2]*y_+y_].squeeze()
     try:
         A_ = load_A_matrix(save_root=save_root, block_id=block_id, min_size=0)
-        # A_[A_<A_.max()*0] = 0
         A_[A_<A_.max(axis=0, keepdims=True)*0.3]=0
         A_ = A_.reshape((x_, y_, -1), order="F")
         mask_ = mask[x_*block_id[1]:x_*(block_id[1]+1), y_*block_id[2]:y_*(block_id[2]+1)]
@@ -303,38 +259,6 @@ def check_demix_cells(save_root, block_id, plot_global=True, plot_mask=True, mas
     return None
 
 
-# def check_demix_cells_layer(save_root, nlayer, nsplit = (10, 16)):
-#     import matplotlib.pyplot as plt
-#     Y_d_ave = da.from_zarr(f'{save_root}/Y_max.zarr')
-#     Y_d_ave_ = Y_d_ave.blocks[nlayer].squeeze().compute(scheduler='threads')
-#     v_max = np.percentile(Y_d_ave_, 95)
-#     _, xdim, ydim, _ = Y_d_ave.shape
-#     _, x_, y_, _ = Y_d_ave.chunksize
-#     A_mat = np.zeros((xdim, ydim))
-#     n_comp = 1
-#     for nx in range(nsplit[0]):
-#         for ny in range(nsplit[1]):
-#             try:
-#                 A_ = load_A_matrix(save_root=save_root, ext='', block_id=(nlayer, nx, ny, 0), min_size=0)
-#                 for n in range(A_.shape[-1]):
-#                     n_max = A_[:, n].max()
-#                     A_[A_[:,n]<n_max*0.2, n] = 0
-#                 A_comp = np.zeros(A_.shape[0])
-#                 A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + n_comp
-#                 A_mat[x_*nx:x_*(nx+1), y_*ny:y_*(ny+1)] =A_comp.reshape(y_, x_).T
-#                 n_comp = A_mat.max()+1
-#             except:
-#                 pass
-
-#     plt.figure(figsize=(8, 8))
-#     A_mat[A_mat>0] = A_mat[A_mat>0]%60+1
-#     plt.imshow(A_mat, cmap=plt.cm.nipy_spectral_r, alpha=1.0)
-#     plt.title('Components')
-#     plt.axis('off')
-#     plt.show()
-#     return None
-
-
 def check_demix_cells_layer(save_root, nlayer, nsplit = (10, 16), mask=None):
     import matplotlib.pyplot as plt
     Y_d_ave = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
@@ -360,68 +284,6 @@ def check_demix_cells_layer(save_root, nlayer, nsplit = (10, 16), mask=None):
     plt.axis('off')
     plt.show()
     return None
-
-
-# def check_demix_cells_whole_brain(save_root, nsplit = (10, 16)):
-#     import matplotlib.pyplot as plt
-#     Y_d_ave = da.from_zarr(f'{save_root}/Y_max.zarr')
-#     Y_d_ave_ = Y_d_ave.max(axis=0).squeeze().compute(scheduler='threads')
-#     v_max = np.percentile(Y_d_ave_, 95)
-#     ldim, xdim, ydim, _ = Y_d_ave.shape
-#     _, x_, y_, _ = Y_d_ave.chunksize
-#     A_mat = np.zeros((xdim, ydim))
-#     n_comp = 1
-#     for nlayer in range(ldim):
-#         for nx in range(nsplit[0]):
-#             for ny in range(nsplit[1]):
-#                 try:
-#                     A_ = load_A_matrix(save_root=save_root, block_id=(nlayer, nx, ny, 0), min_size=0)
-#                     for n in range(A_.shape[-1]):
-#                         n_max = A_[:, n].max()
-#                         A_[A_[:,n]<n_max*0.2, n] = 0
-#                     A_comp = np.zeros(A_.shape[0])
-#                     A_comp[A_.sum(axis=-1)>0] = np.argmax(A_[A_.sum(axis=-1)>0, :], axis=-1) + n_comp
-#                     A_mat[x_*nx:x_*(nx+1), y_*ny:y_*(ny+1)] =A_comp.reshape(y_, x_).T
-#                     n_comp = A_mat.max()+1
-#                 except:
-#                     pass
-
-#     plt.figure(figsize=(8, 8))
-#     A_mat[A_mat>0] = A_mat[A_mat>0]%60+1
-#     plt.imshow(A_mat, cmap=plt.cm.nipy_spectral_r)
-#     plt.title('Components')
-#     plt.axis('off')
-#     plt.show()
-
-#     plt.figure(figsize=(8, 8))
-#     plt.imshow(Y_d_ave_, vmax=v_max)
-#     plt.title('Max Intensity')
-#     plt.axis('off')
-#     plt.show()
-#     return None
-
-
-# def compute_cell_dff_raw(save_root, mask, dask_tmp=None, memory_limit=0):
-#     '''
-#       1. local pca denoise (\delta F signal)
-#       2. baseline
-#       3. Cell weight matrix apply to denoise and baseline
-#       4. dff
-#     '''
-#     # set worker
-#     if not os.path.exists(f'{save_root}/cell_raw_dff'):
-#         os.mkdir(f'{save_root}/cell_raw_dff')
-#     cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
-#     print_client_links(cluster)
-#     trans_data_t = da.from_zarr(f'{save_root}/motion_corrected_data.zarr')
-#     Y_d = da.from_zarr(f'{save_root}/detrend_data.zarr')
-#     baseline_t = da.map_blocks(baseline_from_Yd, trans_data_t, Y_d, dtype='float32')
-#     Y_d[~mask]=0
-#     if not os.path.exists(f'{save_root}/cell_raw_dff'):
-#         os.makedirs(f'{save_root}/cell_raw_dff')
-#     da.map_blocks(compute_cell_raw_dff, baseline_t, Y_d, dtype='float32', chunks=(1, 1, 1, 1), save_root=save_root, ext='').compute()
-#     fdask.terminate_workers(cluster, client)
-#     return None
 
 
 def compute_cell_dff_raw(save_root, mask, dask_tmp=None, memory_limit=0):

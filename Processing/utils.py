@@ -90,19 +90,6 @@ def save_h5_rescale(filename, data, reset_max_int=65535):
 
 
 def baseline(data, window=100, percentile=15, downsample=10, axis=-1):
-    """
-    Get the baseline of a numpy array using a windowed percentile filter with optional downsampling
-    data : Numpy array
-        Data from which baseline is calculated
-    window : int
-        Window size for baseline estimation. If downsampling is used, window shrinks proportionally
-    percentile : int
-        Percentile of data used as baseline
-    downsample : int
-        Rate of downsampling used before estimating baseline. Defaults to 1 (no downsampling).
-    axis : int
-        For ndarrays, this specifies the axis to estimate baseline along. Default is -1.
-    """
     from scipy.ndimage.filters import percentile_filter
     from scipy.interpolate import interp1d
     from numpy import ones
@@ -290,33 +277,6 @@ def load_A_matrix(save_root='.', ext='', block_id=None, min_size=40):
 
 def pos_sig_correction(mov, dt, axis_=-1):
     return mov - (mov[:, :, dt]).min(axis=axis_, keepdims=True)
-
-
-# def compute_cell_raw_dff(block_F0, block_dF, save_root='.', ext='', block_id=None):
-#     from fish_proc.utils.demix import recompute_C_matrix
-#     _, x_, y_, _ = block_F0.shape
-#     A_= load_A_matrix(save_root=save_root, ext=ext, block_id=block_id, min_size=0)
-#     if A_.sum()==0:
-#         return np.zeros([1]*4) # return if no components
-#     if np.abs(block_dF).sum()==0:
-#         return np.zeros([1]*4) # return if out of brain
-    
-#     fsave = f'{save_root}/cell_raw_dff/period_Y_demix_block_'
-#     for _ in block_id:
-#         fsave += '_'+str(_)
-#     fsave += '_rlt.h5'
-    
-#     F0 = block_F0.squeeze(axis=0).reshape((x_*y_, -1), order='F')
-#     dF = block_dF.squeeze(axis=0).reshape((x_*y_, -1), order='F')
-#     cell_F0 = np.linalg.inv(A_.T.dot(A_)).dot(np.matmul(A_.T, F0))
-#     cell_dF = np.linalg.inv(A_.T.dot(A_)).dot(np.matmul(A_.T, dF))
-    
-#     with File(fsave, 'w') as f:
-#         f.create_dataset('A_loc', data=np.array([block_id[0], x_*block_id[1], y_*block_id[2]]))
-#         f.create_dataset('A', data=A_.reshape((x_, y_, -1), order="F"))
-#         f.create_dataset('cell_dFF', data=cell_dF/cell_F0)
-#         f.close()
-#     return np.zeros([1]*4)
 
 
 def compute_cell_raw_dff(block_F, mask, save_root='.', ext='', block_id=None):
