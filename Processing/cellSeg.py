@@ -26,6 +26,7 @@ if not os.path.exists(save_root):
 nsplit = (16, 32)
 baseline_percentile = 20
 baseline_window = 1000   # number of frames
+down_sample_registration = 1
 num_t_chunks = 80
 cameraNoiseMat = '/nrs/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
 
@@ -36,10 +37,13 @@ if not os.path.exists(save_root):
 print('========================')
 print('Preprocessing')
 if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
-    preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit=nsplit, num_t_chunks=num_t_chunks, dask_tmp=dask_tmp, memory_limit=memory_limit, is_bz2=False)
+    preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit=nsplit, \
+                  num_t_chunks=num_t_chunks, dask_tmp=dask_tmp, memory_limit=memory_limit, \
+                  is_bz2=False, down_sample_registration=down_sample_registration)
 
 if not os.path.exists(f'{save_root}/detrend_data.zarr'):
-    detrend_data(dir_root, save_root, window=baseline_window, percentile=baseline_percentile, nsplit=nsplit, dask_tmp=dask_tmp, memory_limit=memory_limit)
+    detrend_data(dir_root, save_root, window=baseline_window, percentile=baseline_percentile, \
+                 nsplit=nsplit, dask_tmp=dask_tmp, memory_limit=memory_limit)
 
 
 print('========================')

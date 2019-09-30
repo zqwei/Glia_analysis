@@ -19,7 +19,7 @@ def print_client_links(cluster):
 
 
 def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (4, 4), num_t_chunks = 80,\
-                  dask_tmp=None, memory_limit=0, is_bz2=False, is_singlePlane=False):
+                  dask_tmp=None, memory_limit=0, is_bz2=False, is_singlePlane=False, down_sample_registration=1):
     # set worker
     cluster, client = fdask.setup_workers(is_local=True, dask_tmp=dask_tmp, memory_limit=memory_limit)
     print_client_links(cluster)
@@ -81,15 +81,22 @@ def preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit = (
 
     # compute affine transform
     print('Registration to reference image ---')
+    # create trans_affs file
     if not os.path.exists(f'{save_root}/trans_affs.npy'):
         ref_img = File(f'{save_root}/motion_fix_.h5', 'r')['default'].value
         ref_img = ref_img.max(axis=0, keepdims=True)
-        trans_affine = denoised_data.map_blocks(lambda x: estimate_rigid2d(x, fixed=ref_img), dtype='float32', drop_axis=(3), chunks=(1,4,4)).compute()
+        if down_sample_registration==1:
+            trans_affine = denoised_data.map_blocks(lambda x: estimate_rigid2d(x, fixed=ref_img), dtype='float32', drop_axis=(3), chunks=(1,4,4)).compute()
+        else:
+            #### downsample trans_affine case
+            trans_affine = denoised_data[0::down_sample_registration].map_blocks(lambda x: estimate_rigid2d(x, fixed=ref_img), dtype='float32', drop_axis=(3), chunks=(1,4,4)).compute()
+            len_dat = denoised_data.shape[0]
+            trans_affine = rigid_interp(trans_affine, down_sample_registration, len_dat)
+        # save trans_affs file
         np.save(f'{save_root}/trans_affs.npy', trans_affine)
-        trans_affine_ = da.from_array(trans_affine, chunks=(1,4,4))
-    else:
-        trans_affine_ = np.load(f'{save_root}/trans_affs.npy')
-        trans_affine_ = da.from_array(trans_affine_, chunks=(1,4,4))
+    # load trans_affs file
+    trans_affine_ = np.load(f'{save_root}/trans_affs.npy')
+    trans_affine_ = da.from_array(trans_affine_, chunks=(1,4,4))
     print('--- Done registration reference image')
 
     # apply affine transform

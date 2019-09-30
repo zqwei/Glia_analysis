@@ -46,6 +46,11 @@ def estimate_rigid2d(moving, fixed=None, affs=None, to3=True):
     return expand_dims(affs, 0)
 
 
+def rigid_interp(trans_affine, down_sample_registration, len_dat):
+    trans_affine_ = np.repeat(trans_affine, down_sample_registration, axis=0)
+    return trans_affine_[:len_dat]
+
+
 def estimate_translation2d(moving, fixed=None, to3=True):
     from fish_proc.imageRegistration.imTrans import ImAffine
     from numpy import expand_dims
