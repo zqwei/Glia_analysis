@@ -3,7 +3,7 @@
 import os, sys
 import warnings
 warnings.filterwarnings('ignore')
-from cellProcessing_single_WS import *
+from fish_proc.wholeBrainDask.cellProcessing_single_WS import *
 import dask.array as da
 import numpy as np
 
