@@ -4,9 +4,11 @@ import os, sys
 import warnings
 warnings.filterwarnings('ignore')
 from fish_proc.wholeBrainDask.cellProcessing_single_WS import *
+from fish_proc.utils.fileio import make_tarfile
 import dask.array as da
 import numpy as np
 import pandas as pd
+import shutil
 
 df = pd.read_csv('data_list.csv')
 dask_tmp = '/nrs/ahrens/Ziqiang/dask-worker-space'
@@ -21,6 +23,8 @@ for ind, row in df.iterrows():
     dir_root = row['dat_dir'] # +'im/'
     save_root = row['save_dir']
     if os.path.exists(f'{save_root}/cell_raw_dff_sparse.npz'):
+        continue
+    if os.path.exists(f'{save_root}/sup_demix_rlt'):
         continue
     if not os.path.exists(save_root):
         os.makedirs(save_root)
@@ -50,3 +54,18 @@ for ind, row in df.iterrows():
     dt = 3
     is_skip = True
     demix_cells(save_root, dt, is_skip=is_skip, dask_tmp=dask_tmp, memory_limit=memory_limit)
+    
+    # remove some files --
+    Y_d = da.from_zarr(f'{save_root}/Y_max.zarr')
+    np.save(f'{save_root}/Y_max', Y_d.compute())
+    Y_d = da.from_zarr(f'{save_root}/Y_d_max.zarr')
+    np.save(f'{save_root}/Y_d_max', Y_d.compute())
+    Y_d = da.from_zarr(f'{save_root}/Y_ave.zarr')
+    chunks = Y_d.chunksize[:-1]
+    np.save(f'{save_root}/Y_ave', Y_d.compute())
+    np.save(f'{save_root}/chunks', chunks)
+    
+    for nfolder in glob(save_root+'/Y_*.zarr/'):
+        shutil.rmtree(nfolder)
+    shutil.rmtree(f'{save_root}/detrend_data.zarr')
+    make_tarfile(save_root+'sup_demix_rlt.tar.gz', save_root+'sup_demix_rlt')
