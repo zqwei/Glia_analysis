@@ -18,7 +18,7 @@ num_t_chunks = 30
 cameraNoiseMat = '/nrs/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
 
 for ind, row in df.iterrows():
-    dir_root = row['dat_dir']+'im/'
+    dir_root = row['dat_dir'] # +'im/'
     save_root = row['save_dir']
     if os.path.exists(f'{save_root}/cell_raw_dff_sparse.npz'):
         continue
@@ -26,15 +26,19 @@ for ind, row in df.iterrows():
         os.makedirs(save_root)
     files = sorted(glob(dir_root+'/*.h5'))
     chunks = File(files[0],'r')['default'].shape
-    nsplit = (chunks[1]//32, chunks[2]//32)
+    nsplit = (chunks[1]//64, chunks[2]//64)
     if not os.path.exists(save_root):
         os.makedirs(save_root)
     print('========================')
     print('Preprocessing')
-    if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
+    if not os.path.exists(save_root+'/motion_corrected_data_chunks_%03d.zarr'%(num_t_chunks-1)):
         preprocessing(dir_root, save_root, cameraNoiseMat=cameraNoiseMat, nsplit=nsplit, \
                       num_t_chunks=num_t_chunks, dask_tmp=dask_tmp, memory_limit=memory_limit, \
                       is_bz2=False, down_sample_registration=down_sample_registration)
+    print('========================')
+    print('Combining motion corrected data')
+    if not os.path.exists(f'{save_root}/motion_corrected_data.zarr'):
+        combine_preprocessing(dir_root, save_root, num_t_chunks=num_t_chunks, dask_tmp=dask_tmp, memory_limit=memory_limit)
     if not os.path.exists(f'{save_root}/detrend_data.zarr'):
         detrend_data(dir_root, save_root, window=baseline_window, percentile=baseline_percentile, \
                      nsplit=nsplit, dask_tmp=dask_tmp, memory_limit=memory_limit)
