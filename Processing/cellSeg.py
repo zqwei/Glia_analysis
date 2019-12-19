@@ -36,7 +36,7 @@ for ind, row in df.iterrows():
     print('========================')
     print('Preprocessing')
     if not os.path.exists(savetmp+'/motion_corrected_data_chunks_%03d.zarr'%(num_t_chunks-1)):
-        preprocessing(dir_root, savetmp, cameraNoiseMat=cameraNoiseMat, nsplit=nsplit, \
+        preprocessing(dir_root, [savetmp, save_root], cameraNoiseMat=cameraNoiseMat, nsplit=nsplit, \
                       num_t_chunks=num_t_chunks, dask_tmp=dask_tmp, memory_limit=memory_limit, \
                       is_bz2=False, down_sample_registration=down_sample_registration)
     print('========================')
