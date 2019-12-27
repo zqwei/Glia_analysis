@@ -17,7 +17,7 @@ memory_limit = 0 # unlimited
 down_sample_registration = 3
 baseline_percentile = 20
 baseline_window = 1000   # number of frames
-num_t_chunks = 25
+num_t_chunks = 40
 cameraNoiseMat = '/nrs/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
 savetmp = '/scratch/weiz/'
 
@@ -85,6 +85,8 @@ for ind, row in df.iterrows():
     combine_dff(savetmp)
     combine_dff_sparse(savetmp)
     
+    shutil.move(f'{savetmp}/motion_fix_.h5', f'{save_root}/motion_fix_.h5')
+    shutil.move(f'{savetmp}/trans_affs.npy', f'{save_root}/trans_affs.npy')
     shutil.move(f'{savetmp}/cell_raw_dff_sparse.npz', f'{save_root}/cell_raw_dff_sparse.npz')
     shutil.move(f'{savetmp}/cell_raw_dff.npz', f'{save_root}/cell_raw_dff.npz')
     
