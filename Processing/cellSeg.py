@@ -5,7 +5,7 @@ import warnings
 warnings.filterwarnings('ignore')
 from fish_proc.wholeBrainDask.cellProcessing_single_WS import *
 import fish_proc.wholeBrainDask.cellProcessing_single_WS as fwc
-from fish_proc.utils.fileio import make_tarfile
+from fish_proc.utils.fileio import make_tarfile, chmod
 import dask.array as da
 import numpy as np
 import pandas as pd
@@ -125,3 +125,6 @@ for ind, row in df.iterrows():
         A_ext[z, x:x+100, y:y+100]=np.maximum(A_ext[z, x:x+100, y:y+100], _[:cx, :cy])
     
     np.savez(save_root+'cell_dff.npz', A=A[~invalid_].astype('float16'), A_loc=A_loc[~invalid_], dFF=dFF[~invalid_].astype('float16'))
+    
+    # change mode in case if the file is not accessible
+    chmod(save_root, mode='0775')
