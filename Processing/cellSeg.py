@@ -5,7 +5,7 @@ import warnings
 warnings.filterwarnings('ignore')
 from fish_proc.wholeBrainDask.cellProcessing_single_WS import *
 import fish_proc.wholeBrainDask.cellProcessing_single_WS as fwc
-from fish_proc.utils.fileio import make_tarfile
+from fish_proc.utils.fileio import make_tarfile, chmod
 import dask.array as da
 import numpy as np
 import pandas as pd
@@ -17,7 +17,7 @@ memory_limit = 0 # unlimited
 down_sample_registration = 3
 baseline_percentile = 20
 baseline_window = 1000   # number of frames
-num_t_chunks = 25
+num_t_chunks = 40
 cameraNoiseMat = '/nrs/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
 savetmp = '/scratch/weiz/'
 
@@ -36,7 +36,7 @@ for ind, row in df.iterrows():
     print('========================')
     print('Preprocessing')
     if not os.path.exists(savetmp+'/motion_corrected_data_chunks_%03d.zarr'%(num_t_chunks-1)):
-        preprocessing(dir_root, savetmp, cameraNoiseMat=cameraNoiseMat, nsplit=nsplit, \
+        preprocessing(dir_root, [savetmp, save_root], cameraNoiseMat=cameraNoiseMat, nsplit=nsplit, \
                       num_t_chunks=num_t_chunks, dask_tmp=dask_tmp, memory_limit=memory_limit, \
                       is_bz2=False, down_sample_registration=down_sample_registration)
     print('========================')
@@ -85,6 +85,8 @@ for ind, row in df.iterrows():
     combine_dff(savetmp)
     combine_dff_sparse(savetmp)
 
+    shutil.move(f'{savetmp}/motion_fix_.h5', f'{save_root}/motion_fix_.h5')
+    shutil.move(f'{savetmp}/trans_affs.npy', f'{save_root}/trans_affs.npy')
     shutil.move(f'{savetmp}/cell_raw_dff_sparse.npz', f'{save_root}/cell_raw_dff_sparse.npz')
     shutil.move(f'{savetmp}/cell_raw_dff.npz', f'{save_root}/cell_raw_dff.npz')
 
@@ -123,3 +125,6 @@ for ind, row in df.iterrows():
         A_ext[z, x:x+100, y:y+100]=np.maximum(A_ext[z, x:x+100, y:y+100], _[:cx, :cy])
 
     np.savez(save_root+'cell_dff.npz', A=A[~invalid_].astype('float16'), A_loc=A_loc[~invalid_], dFF=dFF[~invalid_].astype('float16'))
+
+    # change mode in case if the file is not accessible
+    chmod(save_root, mode='0775')

@@ -20,13 +20,14 @@ for ind, row in df.iterrows():
         continue
     brain_map = np.load(save_root+'Y_ave.npy')
     num_plane = brain_map.shape[0]
-    fig, ax = plt.subplots(4, num_plane//4+1, figsize=(40, 10))
-    ax = ax.flatten()
-    for n, _ in enumerate(brain_map):
-        ax[n].imshow(_.squeeze().astype('float'), vmax=np.percentile(_[:].astype('float'), 95))
-        ax[n].axis('off')
-    plt.savefig(save_root+'brain_map.png')
-    plt.close()
+    if os.path.exists(save_root+'brain_map.png'):
+        fig, ax = plt.subplots(4, num_plane//4+1, figsize=(40, 10))
+        ax = ax.flatten()
+        for n, _ in enumerate(brain_map):
+            ax[n].imshow(_.squeeze().astype('float'), vmax=np.percentile(_[:].astype('float'), 95))
+            ax[n].axis('off')
+        plt.savefig(save_root+'brain_map.png')
+        plt.close()
     
     ## if recompute dFF
     # _ = np.load(save_root+'cell_raw_dff_sparse.npz', allow_pickle=True)
@@ -63,12 +64,13 @@ for ind, row in df.iterrows():
         cx, cy = A_ext[z, x:x+100, y:y+100].shape
         A_ext[z, x:x+100, y:y+100]=np.maximum(A_ext[z, x:x+100, y:y+100], _[:cx, :cy])
     
-    fig, ax = plt.subplots(4, A_ext.shape[0]//4+1, figsize=(40, 10))
-    ax = ax.flatten()
-    for n, _ in enumerate(A_ext):
-        _[_>0] = _[_>0]%32+1
-        ax[n].imshow(_, cmap=plt.cm.nipy_spectral)
-        ax[n].axis('off')
-    plt.savefig(save_root+'components.png')
-    plt.close()
+    if os.path.exists(save_root+'components.png'):
+        fig, ax = plt.subplots(4, A_ext.shape[0]//4+1, figsize=(40, 10))
+        ax = ax.flatten()
+        for n, _ in enumerate(A_ext):
+            _[_>0] = _[_>0]%32+1
+            ax[n].imshow(_, cmap=plt.cm.nipy_spectral)
+            ax[n].axis('off')
+        plt.savefig(save_root+'components.png')
+        plt.close()
     
