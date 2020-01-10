@@ -22,7 +22,7 @@ cameraNoiseMat = '/nrs/ahrens/ahrenslab/Ziqiang/gainMat/gainMat20180208'
 savetmp = '/scratch/weiz/'
 
 for ind, row in df.iterrows():
-    dir_root = row['dat_dir'] # +'im/'
+    dir_root = row['dat_dir']
     save_root = row['save_dir']
     if os.path.exists(f'{save_root}/cell_raw_dff_sparse.npz'):
         continue
