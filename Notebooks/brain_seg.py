@@ -52,6 +52,8 @@ def motor_sensory_ind(row, t_range=(0, np.inf)):
     motor_corr = layer_corr(dFF[:, motor_time], A_loc, corr_thres=0.2, corr_size=10)
     
     np.savez(save_root+'motor_sensory_ind.npz', \
+             motor_time=motor_time, \
+             sensory_time=sensory_time, \
              motor_valid=motor_valid, \
              motor_corr=motor_corr, \
              sensory_valid=sensory_valid, \
