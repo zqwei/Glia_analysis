@@ -8,6 +8,9 @@ import dask.array as da
 import pandas as pd
 from glob import glob
 from tqdm import tqdm
+import seaborn as sns
+sns.set(font_scale=2, style='ticks')
+
 
 
 def ep2frame(camtrig, thres=3.8):
