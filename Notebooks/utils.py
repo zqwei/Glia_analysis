@@ -65,7 +65,21 @@ def matmul(a, b):
     return s
 
 
+def rolling_perc(x, window=180000, perc=1):
+    import pandas as pd
+    s = pd.Series(x).rolling(window=window).quantile(perc).values
+    x_ = np.zeros(len(x))
+    x_[window//2:-window//2]=s[window:]
+    x_[:window//2]=s[window]
+    x_[-window//2:]=s[-1]
+    return x_
 
+
+def wrap_data(x, indx, len_):
+    x_ = np.zeros((len_, len(indx)))
+    for n in range(len_):
+        x_[n] = x[indx+n]
+    return x_
 
 
 # def covariance_gufunc(x, y):
