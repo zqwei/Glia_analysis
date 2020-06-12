@@ -2,6 +2,8 @@
 
 import numpy as np
 import os, sys
+import matplotlib
+matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings('ignore')
