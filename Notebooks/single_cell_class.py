@@ -23,12 +23,17 @@ def pulse_stats(dff_, pulse_trial, nopulse_trial):
     for n, trial in enumerate(nopulse_trial):
         dff_nopulse[n] = dff_[trial+3:trial+10] - dff_[trial+3:trial+5].mean() 
     
-    _, p_mean = ranksums(dff_pulse.sum(axis=-1), dff_nopulse.sum(axis=-1))
+    p_mean = np.zeros(3)
+    _, p_mean[0] = ranksums(dff_pulse.sum(axis=-1), dff_nopulse.sum(axis=-1))
+    _, p_mean[1] = wilcoxon(dff_pulse.sum(axis=-1))
+    _, p_mean[2] = wilcoxon(dff_nopulse.sum(axis=-1))
     
-    p_vec = np.zeros(7)
+    p_vec = np.zeros((3, 7))
     for n in range(7):
-        _, p_ = ranksums(dff_pulse[:, n], dff_nopulse[:, n])
-        p_vec[n] = p_
+        _, p_vec[0, n] = ranksums(dff_pulse[:, n], dff_nopulse[:, n])
+        _, p_vec[1, n] = wilcoxon(dff_swim[:, n])
+        _, p_vec[2, n] = wilcoxon(dff_nopulse[:, n])
+    
     x_ = np.vstack([dff_pulse, dff_nopulse])
     y_ = np.r_[np.zeros(num_pulse), np.ones(num_nopulse)]
     try:
@@ -52,13 +57,18 @@ def motor_stats(dff_, swim_trial, noswim_trial, swim_len, pre_len):
     for n, trial in enumerate(noswim_trial):
         dff_noswim[n] = dff_[trial:trial+pre_len+swim_len] - dff_[trial:trial+pre_len].mean() 
     
-    _, p_mean = ranksums(dff_swim.sum(axis=-1), dff_noswim.sum(axis=-1))
+    p_mean = np.zeros(3)
+    _, p_mean[0] = ranksums(dff_pulse.sum(axis=-1), dff_nopulse.sum(axis=-1))
+    _, p_mean[1] = wilcoxon(dff_pulse.sum(axis=-1))
+    _, p_mean[2] = wilcoxon(dff_nopulse.sum(axis=-1))
     
-    p_vec = np.zeros(swim_len+pre_len)
-    for n in range(swim_len+pre_len):
-        _, p_ = ranksums(dff_swim[:, n], dff_noswim[:, n])
-        _, p__ = wilcoxon(dff_swim[:, n])
-        p_vec[n] = np.max([p_, p__])
+    p_vec = np.zeros((3, 7))
+    for n in range(7):
+        _, p_vec[0, n] = ranksums(dff_pulse[:, n], dff_nopulse[:, n])
+        _, p_vec[1, n] = wilcoxon(dff_swim[:, n])
+        _, p_vec[2, n] = wilcoxon(dff_nopulse[:, n])
+    
+    
     x_ = np.vstack([dff_swim, dff_noswim])
     y_ = np.r_[np.zeros(num_swim), np.ones(num_noswim)]
     try:
