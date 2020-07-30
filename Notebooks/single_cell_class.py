@@ -31,7 +31,7 @@ def pulse_stats(dff_, pulse_trial, nopulse_trial):
     p_vec = np.zeros((3, 7))
     for n in range(7):
         _, p_vec[0, n] = ranksums(dff_pulse[:, n], dff_nopulse[:, n])
-        _, p_vec[1, n] = wilcoxon(dff_swim[:, n])
+        _, p_vec[1, n] = wilcoxon(dff_pulse[:, n])
         _, p_vec[2, n] = wilcoxon(dff_nopulse[:, n])
     
     x_ = np.vstack([dff_pulse, dff_nopulse])
@@ -58,16 +58,15 @@ def motor_stats(dff_, swim_trial, noswim_trial, swim_len, pre_len):
         dff_noswim[n] = dff_[trial:trial+pre_len+swim_len] - dff_[trial:trial+pre_len].mean() 
     
     p_mean = np.zeros(3)
-    _, p_mean[0] = ranksums(dff_pulse.sum(axis=-1), dff_nopulse.sum(axis=-1))
-    _, p_mean[1] = wilcoxon(dff_pulse.sum(axis=-1))
-    _, p_mean[2] = wilcoxon(dff_nopulse.sum(axis=-1))
+    _, p_mean[0] = ranksums(dff_swim.sum(axis=-1), dff_noswim.sum(axis=-1))
+    _, p_mean[1] = wilcoxon(dff_swim.sum(axis=-1))
+    _, p_mean[2] = wilcoxon(dff_noswim.sum(axis=-1))
     
     p_vec = np.zeros((3, 7))
     for n in range(7):
-        _, p_vec[0, n] = ranksums(dff_pulse[:, n], dff_nopulse[:, n])
+        _, p_vec[0, n] = ranksums(dff_swim[:, n], dff_noswim[:, n])
         _, p_vec[1, n] = wilcoxon(dff_swim[:, n])
-        _, p_vec[2, n] = wilcoxon(dff_nopulse[:, n])
-    
+        _, p_vec[2, n] = wilcoxon(dff_noswim[:, n])
     
     x_ = np.vstack([dff_swim, dff_noswim])
     y_ = np.r_[np.zeros(num_swim), np.ones(num_noswim)]
