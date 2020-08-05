@@ -9,7 +9,7 @@ from scipy.stats import spearmanr
 
 
 df = pd.read_csv('../Processing/data_list.csv')
-row = df.iloc[6]
+row = df.iloc[13]
 save_root = row['save_dir']+'/'
 
 _ = np.load(save_root+'cell_dff.npz', allow_pickle=True)

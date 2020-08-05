@@ -34,11 +34,14 @@ def pulse_stats(dff_, pulse_trial, nopulse_trial):
         _, p_vec[1, n] = wilcoxon(dff_pulse[:, n])
         _, p_vec[2, n] = wilcoxon(dff_nopulse[:, n])
     
-    x_ = np.vstack([dff_pulse, dff_nopulse])
-    y_ = np.r_[np.zeros(num_pulse), np.ones(num_nopulse)]
-    try:
-        p_manova = MANOVA(x_, y_).mv_test().results['x0']['stat']
-    except:
+    if (p_mean[0]<0.05) or ((p_vec[0]<0.05).sum()>3):
+        x_ = np.vstack([dff_pulse, dff_nopulse])
+        y_ = np.r_[np.zeros(num_pulse), np.ones(num_nopulse)]
+        try:
+            p_manova = MANOVA(x_, y_).mv_test().results['x0']['stat']
+        except:
+            p_manova = None
+    else:
         p_manova = None
     
     return np.array([p_mean, p_vec, p_manova, dff_pulse.mean(axis=0), dff_nopulse.mean(axis=0)])[None,:],
@@ -62,17 +65,20 @@ def motor_stats(dff_, swim_trial, noswim_trial, swim_len, pre_len):
     _, p_mean[1] = wilcoxon(dff_swim.sum(axis=-1))
     _, p_mean[2] = wilcoxon(dff_noswim.sum(axis=-1))
     
-    p_vec = np.zeros((3, 7))
-    for n in range(7):
+    p_vec = np.zeros((3, swim_len+pre_len))
+    for n in range(swim_len+pre_len):
         _, p_vec[0, n] = ranksums(dff_swim[:, n], dff_noswim[:, n])
         _, p_vec[1, n] = wilcoxon(dff_swim[:, n])
         _, p_vec[2, n] = wilcoxon(dff_noswim[:, n])
     
-    x_ = np.vstack([dff_swim, dff_noswim])
-    y_ = np.r_[np.zeros(num_swim), np.ones(num_noswim)]
-    try:
-        p_manova = MANOVA(x_, y_).mv_test().results['x0']['stat']
-    except:
+    if (p_mean[0]<0.05) or ((p_vec[0]<0.05).sum()>3):
+        x_ = np.vstack([dff_swim, dff_noswim])
+        y_ = np.r_[np.zeros(num_swim), np.ones(num_noswim)]
+        try:
+            p_manova = MANOVA(x_, y_).mv_test().results['x0']['stat']
+        except:
+            p_manova = None
+    else:
         p_manova = None
     
     return np.array([p_mean, p_vec, p_manova, dff_swim.mean(axis=0), dff_noswim.mean(axis=0)])[None,:],
