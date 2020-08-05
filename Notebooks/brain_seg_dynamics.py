@@ -1,4 +1,4 @@
-rom utils import *
+from utils import *
 from brain_seg import brain_seg_factor
 from scipy.stats import spearmanr
 df = pd.read_csv('../Processing/data_list.csv')
