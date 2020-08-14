@@ -18,10 +18,10 @@ def pulse_stats(dff_, pulse_trial, nopulse_trial):
     dff_nopulse = np.zeros((num_nopulse, 7))
     
     for n, trial in enumerate(pulse_trial):
-        dff_pulse[n] = dff_[trial-2:trial+5] - dff_[trial-2:trial].mean()
+        dff_pulse[n] = dff_[trial-2:trial+5] - dff_[trial-1:trial+1].mean()
     
     for n, trial in enumerate(nopulse_trial):
-        dff_nopulse[n] = dff_[trial+3:trial+10] - dff_[trial+3:trial+5].mean() 
+        dff_nopulse[n] = dff_[trial+3:trial+10] - dff_[trial+4:trial+6].mean() 
     
     p_mean = np.zeros(3)
     _, p_mean[0] = ranksums(dff_pulse.sum(axis=-1), dff_nopulse.sum(axis=-1))
@@ -55,10 +55,10 @@ def motor_stats(dff_, swim_trial, noswim_trial, swim_len, pre_len):
     dff_noswim = np.zeros((num_noswim, swim_len+pre_len))
     
     for n, trial in enumerate(swim_trial):
-        dff_swim[n] = dff_[trial-pre_len:trial+swim_len] - dff_[trial-pre_len:trial].mean()
+        dff_swim[n] = dff_[trial-pre_len:trial+swim_len] - dff_[(trial-pre_len+1):trial+1].mean()
     
     for n, trial in enumerate(noswim_trial):
-        dff_noswim[n] = dff_[trial:trial+pre_len+swim_len] - dff_[trial:trial+pre_len].mean() 
+        dff_noswim[n] = dff_[trial:trial+pre_len+swim_len] - dff_[(trial+1):(trial+pre_len+1)].mean() 
     
     p_mean = np.zeros(3)
     _, p_mean[0] = ranksums(dff_swim.sum(axis=-1), dff_noswim.sum(axis=-1))
