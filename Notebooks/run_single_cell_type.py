@@ -43,14 +43,8 @@ dFF = dFF[cells_in_mask]
 ###################################
 dat_dir = row['dat_dir'].replace('/im/', '/')
 p_dir = dat_dir + 'processed/'
-# p_dir = row['dat_dir'] + 'processed/'
-# trial_vars = pd.read_pickle(p_dir+'statemod_expt_trialvars.pkl')
-# behavior = pd.read_pickle(p_dir+'statemod_expt_behavior.pkl')
-# statemod = pd.read_pickle(p_dir+'statemod-input-vars.pkl')
 ephys_dir = dat_dir + 'ephys/'
 ephys_dat = glob(ephys_dir+'/*.10chFlt')[0]
-# ephys_dir = row['dat_dir'] + 'ephys/'
-# ephys_dat = ephys_dir+'/6dpf_HuC-GC7FF_GU-fwd_fish00_exp05.10chFlt'
 fileContent_ = load(ephys_dat)
 l_power = windowed_variance(fileContent_[0])[0]
 r_power = windowed_variance(fileContent_[1])[0]
