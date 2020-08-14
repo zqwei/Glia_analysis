@@ -141,8 +141,12 @@ if swim_on[-1]>swim_off[-1]:
 if swim_on.shape!=swim_off.shape:
     print('Error in swim matches')
 
+swim_lens = (swim_on[1:] - swim_on[:-1])
+swim_lens = np.r_[swim_lens, np.inf]
+swim_on = swim_on[swim_lens>=7]
+swim_off = swim_off[swim_lens>=7]
 swim_len = (swim_on[1:] - swim_on[:-1]).min()
-pre_len = swim_len-2
+pre_len = 2
     
 for n, on_ in enumerate(swim_on):
     epoch = epoch_frame[on_-pre_len:on_+swim_len]
@@ -171,9 +175,10 @@ num_cells = dFF.shape[0]
 cell_sm_stats = np.zeros((num_cells, 5)).astype('O')
 num_cpu = 90
 
+swim_trial_ = np.array(swim_trial)[np.array(swim_type)!=6]
 split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
 for arr in tqdm(split_):
-    cell_sm_stats[arr] = parallel_to_single(motor_stats, dFF[arr], swim_trial=swim_trial, noswim_trial=noswim_trial, swim_len=swim_len, pre_len=pre_len)[0]  
+    cell_sm_stats[arr] = parallel_to_single(motor_stats, dFF[arr], swim_trial=swim_trial_, noswim_trial=noswim_trial, swim_len=swim_len, pre_len=pre_len)[0]  
     
 np.savez(save_root+'cell_type_stats_sm', cell_sm_stats=cell_sm_stats)
     
