@@ -9,7 +9,7 @@ from scipy.stats import spearmanr
 
 
 df = pd.read_csv('../Processing/data_list.csv')
-row = df.iloc[13]
+row = df.iloc[15]
 save_root = row['save_dir']+'/'
 
 _ = np.load(save_root+'cell_dff.npz', allow_pickle=True)
@@ -17,7 +17,6 @@ A = _['A']
 A_loc = _['A_loc']
 dFF = _['dFF'].astype('float')
 _ = None
-
 
 brain_map = np.load(save_root+'Y_ave.npy').astype('float').squeeze()
 A_center = np.load(save_root+'cell_center.npy')
@@ -40,15 +39,18 @@ A_center = A_center[cells_in_mask]
 dFF = dFF[cells_in_mask]
 
 ###################################
-## Sensory cells
+## Downsample sensory and motor input to frames
 ###################################
-
-p_dir = row['dat_dir'] + 'processed/'
+dat_dir = row['dat_dir'].replace('/im/', '/')
+p_dir = dat_dir + 'processed/'
+# p_dir = row['dat_dir'] + 'processed/'
 trial_vars = pd.read_pickle(p_dir+'statemod_expt_trialvars.pkl')
 behavior = pd.read_pickle(p_dir+'statemod_expt_behavior.pkl')
 statemod = pd.read_pickle(p_dir+'statemod-input-vars.pkl')
-ephys_dir = row['dat_dir'] + 'ephys/'
-ephys_dat = ephys_dir+'/6dpf_HuC-GC7FF_GU-fwd_fish00_exp05.10chFlt'
+ephys_dir = dat_dir + 'ephys/'
+ephys_dat = glob(ephys_dir+'/*.10chFlt')[0]
+# ephys_dir = row['dat_dir'] + 'ephys/'
+# ephys_dat = ephys_dir+'/6dpf_HuC-GC7FF_GU-fwd_fish00_exp05.10chFlt'
 fileContent_ = load(ephys_dat)
 l_power = windowed_variance(fileContent_[0])[0]
 r_power = windowed_variance(fileContent_[1])[0]
@@ -75,22 +77,24 @@ visu_frame = np.mean(wrap_data(fileContent_[3], indx, frame_len), axis=0)
 visu_frame_ = visu_frame.copy()
 visu_frame_[visu_frame_<0]=0
 
-
-swim_thres = 0.2
-
+###################################
+## Sensory cells
+###################################
+swim_thres = np.percentile(swim_frame, 85)
 pulse_trial = []
 pulse_type = []
 
 nopulse_trial = []
 nopulse_type = []
 
-pulse_on = np.where((pulse_frame[:-1]==0) & (pulse_frame[1:]==2))[0]+1
+pulse_amp = np.unique(pulse_frame)[1]
+pulse_on = np.where((pulse_frame[:-1]==0) & (pulse_frame[1:]==pulse_amp))[0]+1
 num_dff = dFF.shape[-1]
 pulse_on = pulse_on[pulse_on<num_dff-10]
 
 for n, trial in enumerate(pulse_on):
     swim_ = np.clip(swim_frame[trial-2:trial+5]-swim_thres, 0, np.inf)
-    if swim_.sum()==0:
+    if swim_.sum()==0: # remove the trial mixed pulse and motor
         pulse_trial.append(trial)
         pulse_type.append(epoch_frame[trial]//5)
         
@@ -112,13 +116,12 @@ split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
 for arr in tqdm(split_):
     cell_sensory_stats[arr] = parallel_to_single(pulse_stats, dFF[arr], pulse_trial=pulse_trial, nopulse_trial=nopulse_trial)[0]  
 
+np.savez(save_root+'cell_type_stats_sensory', cell_sensory_stats=cell_sensory_stats)
 
 ###################################
 ## motor cells
 ###################################
-    
-    
-swim_thres = 0.2
+swim_thres = max(np.percentile(swim_frame, 85), 0.2)
 drop_frame = 100
 num_dff = dFF.shape[-1]
 
@@ -178,6 +181,7 @@ split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
 for arr in tqdm(split_):
     cell_sm_stats[arr] = parallel_to_single(motor_stats, dFF[arr], swim_trial=swim_trial, noswim_trial=noswim_trial, swim_len=swim_len, pre_len=pre_len)[0]  
     
+np.savez(save_root+'cell_type_stats_sm', cell_sm_stats=cell_sm_stats)
     
 num_cells = dFF.shape[0]
 cell_motor_stats = np.zeros((num_cells, 5)).astype('O')
@@ -188,4 +192,4 @@ split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
 for arr in tqdm(split_):
     cell_motor_stats[arr] = parallel_to_single(motor_stats, dFF[arr], swim_trial=swim_trial_, noswim_trial=noswim_trial, swim_len=swim_len, pre_len=pre_len)[0]  
 
-np.savez(save_root+'cell_type_stats', cell_sensory_stats=cell_sensory_stats, cell_sm_stats=cell_sm_stats, cell_motor_stats=cell_motor_stats)
+np.savez(save_root+'cell_type_stats_motor', cell_motor_stats=cell_motor_stats)
