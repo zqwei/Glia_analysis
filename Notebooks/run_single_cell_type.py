@@ -78,6 +78,9 @@ swim_thres = np.percentile(swim_frame, 85)
 pulse_trial = []
 pulse_type = []
 
+pulse_motor_trial = []
+pulse_motor_type = []
+
 nopulse_trial = []
 nopulse_type = []
 
@@ -91,6 +94,9 @@ for n, trial in enumerate(pulse_on):
     if swim_.sum()==0: # remove the trial mixed pulse and motor
         pulse_trial.append(trial)
         pulse_type.append(epoch_frame[trial]//5)
+    else:
+        pulse_motor_trial.append(trial)
+        pulse_motor_type.append(epoch_frame[trial]//5)
         
 nopulse_on = epoch_frame%5==4
 nopulse_on = np.where((~nopulse_on[:-1]) & nopulse_on[1:])[0]+1
@@ -105,12 +111,17 @@ for n, trial in enumerate(nopulse_on):
 num_cells = dFF.shape[0]
 cell_sensory_stats = np.zeros((num_cells, 5)).astype('O')
 num_cpu = 90
-
 split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
 for arr in tqdm(split_):
     cell_sensory_stats[arr] = parallel_to_single(pulse_stats, dFF[arr], pulse_trial=pulse_trial, nopulse_trial=nopulse_trial)[0]  
-
 np.savez(save_root+'cell_type_stats_sensory', cell_sensory_stats=cell_sensory_stats)
+
+cell_pulse_motor_stats = np.zeros((num_cells, 5)).astype('O')
+num_cpu = 90    
+split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
+for arr in tqdm(split_):
+    cell_pulse_motor_stats[arr] = parallel_to_single(pulse_stats, dFF[arr], pulse_trial=pulse_motor_trial, nopulse_trial=nopulse_trial)[0]  
+
 
 ###################################
 ## motor cells
