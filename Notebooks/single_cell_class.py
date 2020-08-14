@@ -95,3 +95,40 @@ def boxcarKernel(sigma=60):
 def gaussKernel(sigma=20):
     kernel = (1/(np.sqrt(2*np.pi)*sigma))*np.exp(-(np.arange(-sigma*3,sigma*3+1)**2)/(2*sigma**2))
     return kernel/kernel.sum()
+
+
+def comp_stats(dff_, cond_trial, comp_trial, pre, post):
+    dff_ = dff_.squeeze()
+    num_cond = len(cond_trial)
+    num_comp = len(comp_trial)
+    dff_cond = np.zeros((num_cond, pre+post))
+    dff_comp = np.zeros((num_comp, pre+post))
+    
+    for n, trial in enumerate(cond_trial):
+        dff_cond[n] = dff_[trial-pre:trial+post] - dff_[trial-1:trial+1].mean()
+    
+    for n, trial in enumerate(comp_trial):
+        dff_comp[n] = dff_[trial-pre:trial+post] - dff_[trial-1:trial+1].mean()
+    
+    p_mean = np.zeros(3)
+    _, p_mean[0] = ranksums(dff_cond.sum(axis=-1), dff_comp.sum(axis=-1))
+    _, p_mean[1] = wilcoxon(dff_cond.sum(axis=-1))
+    _, p_mean[2] = wilcoxon(dff_comp.sum(axis=-1))
+    
+    p_vec = np.zeros((3, 7))
+    for n in range(7):
+        _, p_vec[0, n] = ranksums(dff_cond[:, n], dff_comp[:, n])
+        _, p_vec[1, n] = wilcoxon(dff_cond[:, n])
+        _, p_vec[2, n] = wilcoxon(dff_comp[:, n])
+    
+    if (p_mean[0]<0.05) or ((p_vec[0]<0.05).sum()>3):
+        x_ = np.vstack([dff_cond, dff_comp])
+        y_ = np.r_[np.zeros(num_cond), np.ones(dff_comp)]
+        try:
+            p_manova = MANOVA(x_, y_).mv_test().results['x0']['stat']
+        except:
+            p_manova = None
+    else:
+        p_manova = None
+    
+    return np.array([p_mean, p_vec, p_manova, dff_cond.mean(axis=0), dff_comp.mean(axis=0)])[None,:],
