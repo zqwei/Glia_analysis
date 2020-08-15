@@ -115,7 +115,7 @@ def comp_stats(dff_, cond_trial, comp_trial, pre, post):
     _, p_mean[1] = wilcoxon(dff_cond.sum(axis=-1))
     _, p_mean[2] = wilcoxon(dff_comp.sum(axis=-1))
     
-    p_vec = np.zeros((3, 7))
+    p_vec = np.zeros((3, pre+post))
     for n in range(7):
         _, p_vec[0, n] = ranksums(dff_cond[:, n], dff_comp[:, n])
         _, p_vec[1, n] = wilcoxon(dff_cond[:, n])
@@ -123,7 +123,7 @@ def comp_stats(dff_, cond_trial, comp_trial, pre, post):
     
     if (p_mean[0]<0.05) or ((p_vec[0]<0.05).sum()>3):
         x_ = np.vstack([dff_cond, dff_comp])
-        y_ = np.r_[np.zeros(num_cond), np.ones(dff_comp)]
+        y_ = np.r_[np.zeros(num_cond), np.ones(num_comp)]
         try:
             p_manova = MANOVA(x_, y_).mv_test().results['x0']['stat']
         except:
