@@ -108,27 +108,27 @@ for n, trial in enumerate(nopulse_on):
         nopulse_trial.append(trial)
         nopulse_type.append(epoch_frame[trial]//5)
 
-num_cells = dFF.shape[0]
-cell_sensory_stats = np.zeros((num_cells, 5)).astype('O')
-num_cpu = 90
-split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
-for arr in tqdm(split_):
-    cell_sensory_stats[arr] = parallel_to_single(pulse_stats, dFF[arr], pulse_trial=pulse_trial, nopulse_trial=nopulse_trial)[0]  
-np.savez(save_root+'cell_type_stats_sensory', cell_sensory_stats=cell_sensory_stats)
+# num_cells = dFF.shape[0]
+# cell_sensory_stats = np.zeros((num_cells, 5)).astype('O')
+# num_cpu = 90
+# split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
+# for arr in tqdm(split_):
+#     cell_sensory_stats[arr] = parallel_to_single(pulse_stats, dFF[arr], pulse_trial=pulse_trial, nopulse_trial=nopulse_trial)[0]  
+# np.savez(save_root+'cell_type_stats_sensory', cell_sensory_stats=cell_sensory_stats)
 
-cell_pulse_motor_stats = np.zeros((num_cells, 5)).astype('O')
-num_cpu = 90    
-split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
-for arr in tqdm(split_):
-    cell_pulse_motor_stats[arr] = parallel_to_single(pulse_stats, dFF[arr], pulse_trial=pulse_motor_trial, nopulse_trial=nopulse_trial)[0]  
-np.savez(save_root+'cell_type_stats_pulse_motor', cell_pulse_motor_stats=cell_pulse_motor_stats)
+# cell_pulse_motor_stats = np.zeros((num_cells, 5)).astype('O')
+# num_cpu = 90    
+# split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
+# for arr in tqdm(split_):
+#     cell_pulse_motor_stats[arr] = parallel_to_single(pulse_stats, dFF[arr], pulse_trial=pulse_motor_trial, nopulse_trial=nopulse_trial)[0]  
+# np.savez(save_root+'cell_type_stats_pulse_motor', cell_pulse_motor_stats=cell_pulse_motor_stats)
 
-cell_comp_pulse_motor_stats = np.zeros((num_cells, 5)).astype('O')
+# cell_comp_pulse_motor_stats = np.zeros((num_cells, 5)).astype('O')
 num_cpu = 90    
 split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
 for arr in tqdm(split_):
     cell_comp_pulse_motor_stats[arr] = parallel_to_single(comp_stats, dFF[arr], cond_trial=pulse_trial, comp_trial=pulse_motor_trial, pre=2, post=5)[0]  
-np.savez(save_root+'cell_type_stats_pulse_motor', cell_pulse_motor_stats=cell_pulse_motor_stats)
+np.savez(save_root+'cell_comp_pulse_motor_stats', cell_comp_pulse_motor_stats=cell_comp_pulse_motor_stats)
 
 ###################################
 ## motor cells
@@ -210,3 +210,35 @@ for arr in tqdm(split_):
     cell_motor_stats[arr] = parallel_to_single(motor_stats, dFF[arr], swim_trial=swim_trial_, noswim_trial=noswim_trial, swim_len=swim_len, pre_len=pre_len)[0]  
 
 np.savez(save_root+'cell_type_stats_motor', cell_motor_stats=cell_motor_stats)
+
+
+###################################
+## active vs passive cells
+###################################
+swim_thres = max(np.percentile(swim_frame, 85), 0.2)
+
+active_pulse_trial = []
+passive_pulse_trial = []
+
+active_on = np.where((epoch_frame[1:]==3) & (epoch_frame[:-1]==2))[0]+1
+passive_on = np.where((epoch_frame[1:]==8) & (epoch_frame[:-1]==7))[0]+1
+post_ = 50
+pre_ = 2
+
+for n, trial in enumerate(active_on):
+    swim_ = np.clip(swim_frame[trial-pre_:trial+post_]-swim_thres, 0, np.inf)
+    if swim_.sum()==0:
+        active_pulse_trial.append(trial)
+    
+for n, trial in enumerate(passive_on):
+    swim_ = np.clip(swim_frame[trial-pre_:trial+post_]-swim_thres, 0, np.inf)
+    if swim_.sum()==0:
+        passive_pulse_trial.append(trial)
+
+num_cells = dFF.shape[0]
+cell_active_pulse_stats = np.zeros((num_cells, 5)).astype('O')
+num_cpu = 90
+split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
+for arr in tqdm(split_):
+    cell_active_pulse_stats[arr] = parallel_to_single(comp_stats, dFF[arr], cond_trial=active_pulse_trial, comp_trial=passive_pulse_trial, pre=pre_, post=post_)[0]  
+np.savez(save_root+'cell_active_pulse_stats', cell_active_pulse_stats=cell_active_pulse_stats)
