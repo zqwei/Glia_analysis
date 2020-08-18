@@ -71,7 +71,9 @@ def motor_stats(dff_, swim_trial, noswim_trial, swim_len, pre_len):
         _, p_vec[1, n] = wilcoxon(dff_swim[:, n])
         _, p_vec[2, n] = wilcoxon(dff_noswim[:, n])
     
-    if (p_mean[0]<0.05) or ((p_vec[0]<0.05).sum()>3):
+    p_manova = None
+    
+    if (p_mean[0]<0.05) or ((p_vec[0]<0.05).sum()>(swim_len+pre_len)//2+1):
         x_ = np.vstack([dff_swim, dff_noswim])
         y_ = np.r_[np.zeros(num_swim), np.ones(num_noswim)]
         try:
@@ -121,7 +123,9 @@ def comp_stats(dff_, cond_trial, comp_trial, pre, post):
         _, p_vec[1, n] = wilcoxon(dff_cond[:, n])
         _, p_vec[2, n] = wilcoxon(dff_comp[:, n])
     
-    if (p_mean[0]<0.05) or ((p_vec[0]<0.05).sum()>3):
+    p_manova = None
+    
+    if (p_mean[0]<0.05) or ((p_vec[0]<0.05).sum()>(pre+post)//2+1):
         x_ = np.vstack([dff_cond, dff_comp])
         y_ = np.r_[np.zeros(num_cond), np.ones(num_comp)]
         try:
