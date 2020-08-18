@@ -108,22 +108,24 @@ for n, trial in enumerate(nopulse_on):
         nopulse_trial.append(trial)
         nopulse_type.append(epoch_frame[trial]//5)
 
-# num_cells = dFF.shape[0]
-# cell_sensory_stats = np.zeros((num_cells, 5)).astype('O')
-# num_cpu = 90
-# split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
-# for arr in tqdm(split_):
-#     cell_sensory_stats[arr] = parallel_to_single(pulse_stats, dFF[arr], pulse_trial=pulse_trial, nopulse_trial=nopulse_trial)[0]  
-# np.savez(save_root+'cell_type_stats_sensory', cell_sensory_stats=cell_sensory_stats)
+num_cells = dFF.shape[0]
+cell_sensory_stats = np.zeros((num_cells, 5)).astype('O')
+num_cpu = 90
+split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
+for arr in tqdm(split_):
+    cell_sensory_stats[arr] = parallel_to_single(pulse_stats, dFF[arr], pulse_trial=pulse_trial, nopulse_trial=nopulse_trial)[0]  
+np.savez(save_root+'cell_type_stats_sensory', cell_sensory_stats=cell_sensory_stats)
 
-# cell_pulse_motor_stats = np.zeros((num_cells, 5)).astype('O')
-# num_cpu = 90    
-# split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
-# for arr in tqdm(split_):
-#     cell_pulse_motor_stats[arr] = parallel_to_single(pulse_stats, dFF[arr], pulse_trial=pulse_motor_trial, nopulse_trial=nopulse_trial)[0]  
-# np.savez(save_root+'cell_type_stats_pulse_motor', cell_pulse_motor_stats=cell_pulse_motor_stats)
+num_cells = dFF.shape[0]
+cell_pulse_motor_stats = np.zeros((num_cells, 5)).astype('O')
+num_cpu = 90    
+split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
+for arr in tqdm(split_):
+    cell_pulse_motor_stats[arr] = parallel_to_single(pulse_stats, dFF[arr], pulse_trial=pulse_motor_trial, nopulse_trial=nopulse_trial)[0]  
+np.savez(save_root+'cell_type_stats_pulse_motor', cell_pulse_motor_stats=cell_pulse_motor_stats)
 
-# cell_comp_pulse_motor_stats = np.zeros((num_cells, 5)).astype('O')
+num_cells = dFF.shape[0]
+cell_comp_pulse_motor_stats = np.zeros((num_cells, 5)).astype('O')
 num_cpu = 90    
 split_ = np.array_split(np.arange(num_cells), num_cells//num_cpu)
 for arr in tqdm(split_):
