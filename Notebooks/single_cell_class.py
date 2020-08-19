@@ -118,7 +118,7 @@ def comp_stats(dff_, cond_trial, comp_trial, pre, post):
     _, p_mean[2] = wilcoxon(dff_comp.sum(axis=-1))
     
     p_vec = np.zeros((3, pre+post))
-    for n in range(7):
+    for n in range(pre+post):
         _, p_vec[0, n] = ranksums(dff_cond[:, n], dff_comp[:, n])
         _, p_vec[1, n] = wilcoxon(dff_cond[:, n])
         _, p_vec[2, n] = wilcoxon(dff_comp[:, n])
