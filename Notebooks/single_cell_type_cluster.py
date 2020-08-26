@@ -12,9 +12,6 @@ from fish_proc.utils.memory import clear_variables
 from fish_proc.utils import dask_ as fdask
 
 
-df = pd.read_csv('../Processing/data_list.csv')
-row = df.iloc[5]
-
 def bar_code(row):
     save_root = row['save_dir']+'/'
     _ = np.load(save_root+'cell_dff.npz', allow_pickle=True)
