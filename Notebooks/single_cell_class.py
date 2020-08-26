@@ -157,3 +157,30 @@ def open_ephys_metadata(xml):
     columns.remove('epoch')
     index = [s['epoch'] for s in StimConds]
     return pd.DataFrame(StimConds, index=index, columns=columns)
+
+
+def comp_stats_chunks(dff, cond_trial=None, comp_trial=None, pre=None, post=None):
+    num_cells = dff.shape[0]
+    cell_stats = np.zeros((num_cells, 5)).astype('O')
+    for n in range(num_cells):
+        _ = comp_stats(dff[n], cond_trial=cond_trial, comp_trial=comp_trial, pre=pre, post=post)
+        cell_stats[n]=_[0]
+    return cell_stats
+
+
+def motor_stats_chunks(dff, swim_trial=None, noswim_trial=None, swim_len=None, pre_len=None):
+    num_cells = dff.shape[0]
+    cell_stats = np.zeros((num_cells, 5)).astype('O')
+    for n in range(num_cells):
+        _ = motor_stats(dff[n], swim_trial=swim_trial_, noswim_trial=noswim_trial, swim_len=swim_len, pre_len=pre_len)
+        cell_stats[n]=_[0]
+    return cell_stats
+
+
+def pulse_stats_chunks(dff, pulse_trial=None, nopulse_trial=None):
+    num_cells = dff.shape[0]
+    cell_stats = np.zeros((num_cells, 5)).astype('O')
+    for n in range(num_cells):
+        _ = pulse_stats(dff[n], pulse_trial=pulse_trial, nopulse_trial=nopulse_trial)
+        cell_stats[n]=_[0]
+    return cell_stats
