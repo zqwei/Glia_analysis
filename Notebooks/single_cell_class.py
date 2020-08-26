@@ -136,3 +136,24 @@ def comp_stats(dff_, cond_trial, comp_trial, pre, post):
         p_manova = None
     
     return np.array([p_mean, p_vec, p_manova, dff_cond.mean(axis=0), dff_comp.mean(axis=0)])[None,:],
+
+
+def open_ephys_metadata(xml):
+    import xml.etree.ElementTree as et
+    import collections
+    import pandas as pd
+    def tryfloat (x):
+        try: return float(x)
+        except: return(x)
+    tree = et.parse(xml)
+    root = tree.getroot()
+    StimConds = []
+    for r in root.getchildren():
+        StimCond = collections.OrderedDict()
+        for e in r:
+            StimCond[e.tag] = (tryfloat(e.text))
+        StimConds.append(StimCond)
+    columns = list(StimConds[0].keys())
+    columns.remove('epoch')
+    index = [s['epoch'] for s in StimConds]
+    return pd.DataFrame(StimConds, index=index, columns=columns)
