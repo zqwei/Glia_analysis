@@ -172,7 +172,7 @@ def motor_stats_chunks(dff, swim_trial=None, noswim_trial=None, swim_len=None, p
     num_cells = dff.shape[0]
     cell_stats = np.zeros((num_cells, 5)).astype('O')
     for n in range(num_cells):
-        _ = motor_stats(dff[n], swim_trial=swim_trial_, noswim_trial=noswim_trial, swim_len=swim_len, pre_len=pre_len)
+        _ = motor_stats(dff[n], swim_trial=swim_trial, noswim_trial=noswim_trial, swim_len=swim_len, pre_len=pre_len)
         cell_stats[n]=_[0]
     return cell_stats
 
