@@ -64,7 +64,8 @@ def bar_code(row):
 
     expt_meta = glob(dat_dir+'ephys/*end.xml')[0]
     expt_paradigm = open_ephys_metadata(expt_meta)
-    probe_amp = expt_paradigm.loc['LG probe']['velocity']
+    probe_amp = expt_paradigm.loc['LG probe']['velocity'].astype('int')
+    probe_gain = expt_paradigm.loc['LG probe']['gain']
 
     indx = ep2frame(camtrig, thres=3.8)
     frame_ = np.zeros(len(camtrig))
@@ -101,7 +102,7 @@ def bar_code(row):
     nopulse_type = []
 
     pulse_amp = probe_amp #np.unique(pulse_frame)[1]
-    print(np.unique(pulse_frame)[1], probe_amp)
+    print(np.unique(pulse_frame), probe_amp)
     pulse_on = np.where((pulse_frame[:-1]==0) & (pulse_frame[1:]==pulse_amp))[0]+1
     num_dff = dFF.shape[-1]
     pulse_on = pulse_on[pulse_on<num_dff-10]
@@ -129,11 +130,11 @@ def bar_code(row):
         cell_sensory_stats = dFF_.map_blocks(pulse_stats_chunks, pulse_trial=pulse_trial, nopulse_trial=nopulse_trial, dtype='O').compute()  
         np.savez(save_root+'cell_type_stats_sensory', cell_sensory_stats=cell_sensory_stats)
 
-    if len(pulse_motor_trial)>0:
+    if (len(pulse_motor_trial)>0) and (probe_gain==0):
         cell_pulse_motor_stats = dFF_.map_blocks(pulse_stats_chunks, pulse_trial=pulse_motor_trial, nopulse_trial=nopulse_trial, dtype='O').compute()
         np.savez(save_root+'cell_type_stats_pulse_motor', cell_pulse_motor_stats=cell_pulse_motor_stats)
 
-    if (len(pulse_trial)>0) & (len(pulse_motor_trial)>0):
+    if (len(pulse_trial)>0) and (len(pulse_motor_trial)>0) and (probe_gain==0):
         cell_comp_pulse_motor_stats = dFF_.map_blocks(comp_stats_chunks, cond_trial=pulse_trial, comp_trial=pulse_motor_trial, pre=2, post=5, dtype='O').compute()  
         np.savez(save_root+'cell_comp_pulse_motor_stats_', cell_comp_pulse_motor_stats=cell_comp_pulse_motor_stats)
 
@@ -229,7 +230,7 @@ def bar_code(row):
         if swim_.sum()==0:
             passive_pulse_trial.append(trial)
 
-    if (len(active_pulse_trial)>0) & (len(passive_pulse_trial)>0):
+    if (len(active_pulse_trial)>0) and (len(passive_pulse_trial)>0):
         cell_active_pulse_stats = dFF_.map_blocks(comp_stats_chunks, cond_trial=active_pulse_trial, comp_trial=passive_pulse_trial, pre=pre_, post=post_, dtype='O').compute()  
         np.savez(save_root+'cell_active_pulse_stats', cell_active_pulse_stats=cell_active_pulse_stats)
 
