@@ -18,11 +18,11 @@ memory_limit = 0 # unlimited
 
 for ind, row in df.iterrows():
     save_root = row['save_dir']+'/'
-    print(save_root)
     if not os.path.exists(save_root+'Y_ave.npy'):
         continue
     if os.path.exists(save_root+'cell_dff.npz'):
         continue
+    print(save_root)
     brain_map = np.load(save_root+'Y_ave.npy')
     num_plane = brain_map.shape[0]
     if not os.path.exists(save_root+'brain_map.png'):
