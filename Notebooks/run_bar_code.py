@@ -1,12 +1,15 @@
 from single_cell_type_cluster import *
 
 df = pd.read_csv('../Processing/data_list.csv')
-row = df.iloc[15]
 
 for ind, row in df.iterrows():
     save_root = row['save_dir']+'/'
+    print(row)
+    if not (row['taskType']=='LGNGGU'):
+        continue
     if not os.path.exists(save_root+'brain_seg_factors.npz'):
         continue
     if not os.path.exists(save_root+'cell_active_pulse_stats.npz'):
-        continue    
-    bar_code(row)
+        continue  
+    print(save_root)
+    # bar_code(row)
