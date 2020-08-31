@@ -4,12 +4,11 @@ df = pd.read_csv('../Processing/data_list.csv')
 
 for ind, row in df.iterrows():
     save_root = row['save_dir']+'/'
-    print(row['taskType'])
     if not (row['taskType']=='LGNGGU'):
         continue
     if not os.path.exists(save_root+'brain_seg_factors.npz'):
         continue
-    if not os.path.exists(save_root+'cell_active_pulse_stats.npz'):
+    if os.path.exists(save_root+'cell_active_pulse_stats.npz'):
         continue  
     print(save_root)
-    # bar_code(row)
+    bar_code(row)
