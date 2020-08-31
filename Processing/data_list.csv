@@ -1,4 +1,4 @@
-,dat_dir,save_dir,singlePlane, taskType
+,dat_dir,save_dir,singlePlane,taskType
 0,/nrs/ahrens/jing/state_modulation/LG_vs_NGGU/20190907/fish00/7dpf_HuC-GC7FF_GU-fwd_fish00_exp01_20190907_172639/,/nrs/ahrens/Ziqiang/Jing_Glia_project/Processed_data/20190907/fish00/7dpf_HuC-GC7FF_GU-fwd_fish00_exp01_20190907_172639/,False, LGNGGU
 5,/nrs/ahrens/jing/state_modulation/LGGU_vs_NGGU/20191130/fish00/6dpf_HuC-GC7FF_GU-fwd_fish00_exp02_20191130_151303/,/nrs/ahrens/Ziqiang/Jing_Glia_project/Processed_data/20191130/fish00/6dpf_HuC-GC7FF_GU-fwd_fish00_exp02_20191130_151303/,False, LGGUNGGU
 6,/nrs/ahrens/jing/state_modulation/LG_vs_NGGU/20191130/fish00/6dpf_HuC-GC7FF_GU-fwd_fish00_exp05_20191130_194544/,/nrs/ahrens/Ziqiang/Jing_Glia_project/Processed_data/20191130/fish00/6dpf_HuC-GC7FF_GU-fwd_fish00_exp05_20191130_194544/,False, LGNGGU
