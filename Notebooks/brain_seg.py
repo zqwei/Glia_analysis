@@ -78,7 +78,7 @@ def brain_seg_factor(row, t_min=5000, t_max=30000, num_cluster=200, l_thres_=0.5
     _ = np.load(save_root+'cell_dff.npz', allow_pickle=True)
     A = _['A']
     A_loc = _['A_loc']
-    if t_min>(dFF.shape[1]):
+    if t_min>(_['dFF'].shape[1]):
         t_min = 0
     dFF = _['dFF'].astype('float')[:, t_min:t_max]
     dFF_ = _['dFF'].astype('float')
