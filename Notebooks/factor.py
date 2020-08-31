@@ -10,7 +10,7 @@ def factor_(dFF, n_c=10, noise_thres=0.8):
     FA_.fit(dFFz.T)
     valid_cell=FA_.noise_variance_<noise_thres
     # second fitting with less-noisy neurons
-    if valid_cell>10:
+    if valid_cell.sum()>10:
         FA_.fit(dFFz[valid_cell].T)
         # rotation
         lam=FA_.components_.T
