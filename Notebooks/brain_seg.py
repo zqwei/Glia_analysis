@@ -55,17 +55,18 @@ def brain_layer_seg_factor(row, t_min=5000, t_max=30000, l_thres_=0.5, n_thres =
         valid_cell, lam, loadings, rotation_mtx, phi, scores, scores_rot = factor_(dFF[A_center[:,0]==nz], \
                                                                                    n_c=nc, \
                                                                                    noise_thres=n_thres)
-        idx=A_center[:,0]==nz
-        x = A_center[idx, 2]
-        y = A_center[idx, 1]
-        loadings_, valid_c_=thres_factor_(x, y, valid_cell, loadings, l_thres_=l_thres_)
-        print(f'fraction of valid cells: {valid_cell.mean():.2f}')
-        np.savez(save_root+'layer_factors_{:03d}'.format(nz), \
-                 valid_cell=valid_cell, \
-                 lam=lam, loadings=loadings, \
-                 rotation_mtx=rotation_mtx, phi=phi, \
-                 scores=scores, scores_rot=scores_rot, \
-                 x=x, y=y, loadings_=loadings_, valid_c_=valid_c_)
+        if valid_cell is not None:
+            idx=A_center[:,0]==nz
+            x = A_center[idx, 2]
+            y = A_center[idx, 1]
+            loadings_, valid_c_=thres_factor_(x, y, valid_cell, loadings, l_thres_=l_thres_)
+            print(f'fraction of valid cells: {valid_cell.mean():.2f}')
+            np.savez(save_root+'layer_factors_{:03d}'.format(nz), \
+                     valid_cell=valid_cell, \
+                     lam=lam, loadings=loadings, \
+                     rotation_mtx=rotation_mtx, phi=phi, \
+                     scores=scores, scores_rot=scores_rot, \
+                     x=x, y=y, loadings_=loadings_, valid_c_=valid_c_)
 
 
 
@@ -88,12 +89,13 @@ def brain_seg_factor(row, t_min=5000, t_max=30000, num_cluster=200, l_thres_=0.5
     print('========Downsample neurons according to layer factor results========')
     corr_idx = []
     for nz in range(num_z):
-        _ = np.load(save_root+'layer_factors_{:03d}.npz'.format(nz), allow_pickle=True)
-        valid_cell=_['valid_cell']
-        loadings_=_['loadings_']
-        layer_idx = np.where(A_center[:,0]==nz)[0]
-        sub_= (np.abs(loadings_)>0).sum(axis=1)>0
-        corr_idx.append(layer_idx[valid_cell][sub_])
+        if os.path.exists(save_root+'layer_factors_{:03d}.npz'.format(nz)):
+            _ = np.load(save_root+'layer_factors_{:03d}.npz'.format(nz), allow_pickle=True)
+            valid_cell=_['valid_cell']
+            loadings_=_['loadings_']
+            layer_idx = np.where(A_center[:,0]==nz)[0]
+            sub_= (np.abs(loadings_)>0).sum(axis=1)>0
+            corr_idx.append(layer_idx[valid_cell][sub_])
     
     corr_idx=np.hstack(corr_idx)
     
