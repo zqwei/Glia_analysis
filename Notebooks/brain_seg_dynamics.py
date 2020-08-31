@@ -4,7 +4,6 @@ from utils import *
 from brain_seg import brain_seg_factor, brain_layer_seg_factor
 
 df = pd.read_csv('../Processing/data_list.csv')
-len_ = len(df)
 
 for ind, row in df.iterrows():
     save_root = row['save_dir']+'/'
