@@ -10,14 +10,17 @@ def factor_(dFF, n_c=10, noise_thres=0.8):
     FA_.fit(dFFz.T)
     valid_cell=FA_.noise_variance_<noise_thres
     # second fitting with less-noisy neurons
-    FA_.fit(dFFz[valid_cell].T)
-    # rotation
-    lam=FA_.components_.T
-    Rot_=Rotator(power=4)
-    loadings, rotation_mtx, phi=Rot_._promax(lam)
-    scores=FA_.transform(dFFz[valid_cell].T).T
-    scores_rot=np.matmul(np.linalg.inv(rotation_mtx), scores)
-    return valid_cell, lam, loadings, rotation_mtx, phi, scores, scores_rot
+    if valid_cell>10:
+        FA_.fit(dFFz[valid_cell].T)
+        # rotation
+        lam=FA_.components_.T
+        Rot_=Rotator(power=4)
+        loadings, rotation_mtx, phi=Rot_._promax(lam)
+        scores=FA_.transform(dFFz[valid_cell].T).T
+        scores_rot=np.matmul(np.linalg.inv(rotation_mtx), scores)
+        return valid_cell, lam, loadings, rotation_mtx, phi, scores, scores_rot
+    else:
+        return None, None, None, None, None, None, None
 
 
 def thres_factor_(x, y, valid_cell, loadings, l_thres_=0.5, shape_thres_=20, min_size_c=10):
