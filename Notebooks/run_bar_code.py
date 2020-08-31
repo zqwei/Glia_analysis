@@ -4,7 +4,7 @@ df = pd.read_csv('../Processing/data_list.csv')
 
 for ind, row in df.iterrows():
     save_root = row['save_dir']+'/'
-    print(row)
+    print(row['taskType'])
     if not (row['taskType']=='LGNGGU'):
         continue
     if not os.path.exists(save_root+'brain_seg_factors.npz'):
