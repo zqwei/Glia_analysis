@@ -8,7 +8,7 @@ for ind, row in df.iterrows():
         continue
     if not os.path.exists(save_root+'brain_seg_factors.npz'):
         continue
-    if os.path.exists(save_root+'cell_active_pulse_stats.npz'):
-        continue  
-    # print(save_root)
+#     if os.path.exists(save_root+'cell_active_pulse_stats.npz'):
+#         continue  
+    print(save_root)
     bar_code(row)
