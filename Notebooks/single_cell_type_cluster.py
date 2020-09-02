@@ -21,6 +21,7 @@ def bar_code(row):
     p_dir = dat_dir + 'processed/'
     ephys_dir = dat_dir + 'ephys/'
     if not os.path.exists(ephys_dir):
+        print('Missing directory')
         print(ephys_dir)
         return None
     
@@ -73,7 +74,7 @@ def bar_code(row):
 
     expt_meta = glob(dat_dir+'ephys/*end.xml')[0]
     expt_paradigm = open_ephys_metadata(expt_meta)
-    probe_amp = expt_paradigm.loc['LG probe']['velocity'].astype('int')
+    probe_amp = (expt_paradigm.loc['LG probe']['velocity']*100).astype('int')
     probe_gain = expt_paradigm.loc['LG probe']['gain']
 
     indx = ep2frame(camtrig, thres=3.8)
@@ -92,7 +93,7 @@ def bar_code(row):
 
     epoch_frame = np.median(wrap_data(fileContent_[5], indx, frame_len), axis=0).astype('int')
     swim_frame = np.mean(wrap_data(l_power_, indx, frame_len), axis=0)
-    pulse_frame = np.median(wrap_data(fileContent_[8], indx, frame_len), axis=0).astype('int')
+    pulse_frame = np.rint(np.median(wrap_data(fileContent_[8], indx, frame_len), axis=0)*100).astype('int')
     visu_frame = np.mean(wrap_data(fileContent_[3], indx, frame_len), axis=0)
     visu_frame_ = visu_frame.copy()
     visu_frame_[visu_frame_<0]=0
