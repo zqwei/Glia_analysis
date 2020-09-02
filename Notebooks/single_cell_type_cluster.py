@@ -14,6 +14,16 @@ from fish_proc.utils import dask_ as fdask
 
 def bar_code(row):
     save_root = row['save_dir']+'/'
+    # check ephys data
+    dat_dir = row['dat_dir'].replace('/im/', '/')
+    dat_dir = dat_dir.replace('/im_CM0/', '/')
+    dat_dir = dat_dir.replace('/im_CM1/', '/')
+    p_dir = dat_dir + 'processed/'
+    ephys_dir = dat_dir + 'ephys/'
+    if not os.path.exists(ephys_dir):
+        print(ephys_dir)
+        return None
+    
     _ = np.load(save_root+'cell_dff.npz', allow_pickle=True)
     A = _['A']
     A_loc = _['A_loc']
@@ -31,10 +41,12 @@ def bar_code(row):
         mask_ = brain_map[n_layer]>2
         y = A_center_grid[cell_ids, 2]
         x = A_center_grid[cell_ids, 1]
+        x_max, y_max = mask_.shape
         num_cells = len(cell_ids)
         in_mask_ = np.zeros(num_cells).astype('bool')
         for n in range(num_cells):
-            in_mask_[n] = mask_[x[n], y[n]]
+            if (x[n]<x_max) and (y[n]<y_max):
+                in_mask_[n] = mask_[x[n], y[n]]
         cells_in_mask.append(cell_ids[in_mask_])
     cells_in_mask = np.concatenate(cells_in_mask)
     A_center = A_center[cells_in_mask]
@@ -53,9 +65,6 @@ def bar_code(row):
     ###################################
     ## Downsample sensory and motor input to frames
     ###################################
-    dat_dir = row['dat_dir'].replace('/im/', '/')
-    p_dir = dat_dir + 'processed/'
-    ephys_dir = dat_dir + 'ephys/'
     ephys_dat = glob(ephys_dir+'/*.10chFlt')[0]
     fileContent_ = load(ephys_dat)
     l_power = windowed_variance(fileContent_[0])[0]
