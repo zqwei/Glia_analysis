@@ -55,6 +55,51 @@ def pulse_stats(dff_, pulse_trial, nopulse_trial):
     return np.array([p_mean, p_vec, p_manova, dff_pulse.mean(axis=0), dff_nopulse.mean(axis=0)])[None,:],
 
 
+def multi_pulse_stats(dff_, pulse_trial, nopulse_trial, t_pre, t_post):
+    dff_ = dff_.squeeze()
+    num_pulse = len(pulse_trial)
+    num_nopulse = len(nopulse_trial)
+    dff_pulse = np.zeros((num_pulse, t_pre+t_psot))
+    dff_nopulse = np.zeros((num_nopulse, t_pre+t_psot))
+    
+    valid_ = np.zeros(num_pulse).astype('bool')
+    for n, trial in enumerate(pulse_trial):
+        if len(dff_[trial-t_pre:trial+t_psot])==(t_pre+t_psot):
+            dff_pulse[n] = dff_[trial-t_pre:trial+t_psot] - dff_[trial-t_pre:trial].mean()
+            valid_[n] = True
+    dff_pulse = dff_pulse[valid_]
+    
+    valid_ = np.zeros(num_nopulse).astype('bool')
+    for n, trial in enumerate(nopulse_trial):
+        if len(dff_[trial-t_pre:trial+t_psot])==(t_pre+t_psot):
+            dff_nopulse[n] = dff_[trial-t_pre:trial+t_psot] - dff_[trial-t_pre:trial].mean() 
+            valid_[n] = True
+    dff_nopulse = dff_nopulse[valid_]
+    
+    p_mean = np.zeros(3)
+    _, p_mean[0] = ranksums(dff_pulse.sum(axis=-1), dff_nopulse.sum(axis=-1))
+    _, p_mean[1] = wilcoxon(dff_pulse.sum(axis=-1))
+    _, p_mean[2] = wilcoxon(dff_nopulse.sum(axis=-1))
+    
+    p_vec = np.zeros((3, t_pre+t_psot))
+    for n in range(7):
+        _, p_vec[0, n] = ranksums(dff_pulse[:, n], dff_nopulse[:, n])
+        _, p_vec[1, n] = wilcoxon(dff_pulse[:, n])
+        _, p_vec[2, n] = wilcoxon(dff_nopulse[:, n])
+    
+    if (p_mean[0]<0.05) or ((p_vec[0]<0.05).sum()>3):
+        x_ = np.vstack([dff_pulse, dff_nopulse])
+        y_ = np.r_[np.zeros(dff_pulse.shape[0]), np.ones(dff_nopulse.shape[0])]
+        try:
+            p_manova = MANOVA(x_, y_).mv_test().results['x0']['stat']
+        except:
+            p_manova = None
+    else:
+        p_manova = None
+    
+    return np.array([p_mean, p_vec, p_manova, dff_pulse.mean(axis=0), dff_nopulse.mean(axis=0)])[None,:],
+
+
 def motor_stats(dff_, swim_trial, noswim_trial, swim_len, pre_len):
     dff_ = dff_.squeeze()
     num_swim = len(swim_trial)
@@ -206,5 +251,14 @@ def pulse_stats_chunks(dff, pulse_trial=None, nopulse_trial=None):
     cell_stats = np.zeros((num_cells, 5)).astype('O')
     for n in range(num_cells):
         _ = pulse_stats(dff[n], pulse_trial=pulse_trial, nopulse_trial=nopulse_trial)
+        cell_stats[n]=_[0]
+    return cell_stats
+
+
+def multi_pulse_stats_chunks(dff, pulse_trial=None, nopulse_trial=None, t_pre=None, t_post=None):
+    num_cells = dff.shape[0]
+    cell_stats = np.zeros((num_cells, 5)).astype('O')
+    for n in range(num_cells):
+        _ = multi_pulse_stats(dff[n], pulse_trial=pulse_trial, nopulse_trial=nopulse_trial, t_pre=t_pre, t_post=t_post)
         cell_stats[n]=_[0]
     return cell_stats
