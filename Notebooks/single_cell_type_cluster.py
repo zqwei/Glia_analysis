@@ -52,6 +52,7 @@ def bar_code(row):
     cells_in_mask = np.concatenate(cells_in_mask)
     A_center = A_center[cells_in_mask]
     dFF = dFF[cells_in_mask]
+    num_dff = dFF.shape[-1]
 
     numCore = 450
     cluster, client = fdask.setup_workers(numCore=numCore,is_local=False)
@@ -72,7 +73,7 @@ def bar_code(row):
     r_power = windowed_variance(fileContent_[1])[0]
     camtrig = fileContent_[2]
 
-    expt_meta = glob(dat_dir+'ephys/*end.xml')[0]
+    expt_meta = glob(dat_dir+'ephys/*end*.xml')[0]
     expt_paradigm = open_ephys_metadata(expt_meta)
     probe_amp = (expt_paradigm.loc['LG probe']['velocity']*100).astype('int')
     probe_gain = expt_paradigm.loc['LG probe']['gain']
@@ -91,30 +92,67 @@ def bar_code(row):
 
     frame_len = np.min(np.unique(indx[1:]-indx[:-1]))
 
-    epoch_frame = np.median(wrap_data(fileContent_[5], indx, frame_len), axis=0).astype('int')
-    swim_frame = np.mean(wrap_data(l_power_, indx, frame_len), axis=0)
-    pulse_frame = np.rint(np.median(wrap_data(fileContent_[8], indx, frame_len), axis=0)*100).astype('int')
-    visu_frame = np.mean(wrap_data(fileContent_[3], indx, frame_len), axis=0)
+    epoch_frame = np.median(wrap_data(fileContent_[5], indx, frame_len), axis=0).astype('int')[:num_dff]
+    swim_frame = np.mean(wrap_data(l_power_, indx, frame_len), axis=0)[:num_dff]
+    pulse_frame = np.rint(np.median(wrap_data(fileContent_[8], indx, frame_len), axis=0)*100).astype('int')[:num_dff]
+    visu_frame = np.mean(wrap_data(fileContent_[3], indx, frame_len), axis=0)[:num_dff]
     visu_frame_ = visu_frame.copy()
     visu_frame_[visu_frame_<0]=0
+    
+    ###################################
+    ## Swim power threshold for swim detection
+    ###################################
+    swim_thres = max(np.percentile(swim_frame, 85), 0.2)
+    pulse_amp = probe_amp #np.unique(pulse_frame)[1]
+    
+    ###################################
+    ## Sensory cells for multiple pulses
+    ###################################
+    pulse_epoch_on = np.where((epoch_frame[:-1]%5==2) & (epoch_frame[1:]%5==3))[0]
+    pulse_epoch_off = np.where((epoch_frame[:-1]%5==3) & (epoch_frame[1:]%5!=3))[0]
+    mlt_pulse_on = []
+    mlt_pulse_trial = []
+    mlt_pulse_type = []
+    mlt_nopulse_on = []
+    mlt_nopulse_trial = []
+    mlt_nopulse_type = []
 
+    for n_pen, n_pef in zip(pulse_epoch_on, pulse_epoch_off):
+        _ = np.where(pulse_frame[n_pen:n_pef]==pulse_amp)[0]
+        if len(_)>0:
+            mlt_pulse_on.append(n_pen+_[0])
+        else:
+            mlt_nopulse_on.append(n_pen+1)
+
+    t_post = 50
+    t_pre = 5
+    for n, trial in enumerate(mlt_pulse_on):
+        swim_ = np.clip(swim_frame[trial-t_pre:trial+t_post]-swim_thres, 0, np.inf)
+        if swim_.sum()==0: # remove the trial mixed pulse and motor
+            mlt_pulse_trial.append(trial)
+            mlt_pulse_type.append(epoch_frame[trial]//5)
+
+    for n, trial in enumerate(mlt_nopulse_on):
+        swim_ = np.clip(swim_frame[trial-t_pre:trial+t_post]-swim_thres, 0, np.inf)
+        if swim_.sum()==0: # remove the trial mixed pulse and motor
+            mlt_nopulse_trial.append(trial)
+            mlt_nopulse_type.append(epoch_frame[trial]//5)
+    
+    cell_msensory_stats = dFF_.map_blocks(multi_pulse_stats_chunks, pulse_trial=mlt_pulse_trial, nopulse_trial=mlt_nopulse_trial, t_pre=t_pre, t_post=t_post, dtype='O').compute() 
+    np.savez(save_root+'cell_type_stats_msensory', cell_msensory_stats=cell_msensory_stats)
+    
+    
     ###################################
-    ## Sensory cells
-    ###################################
-    swim_thres = np.percentile(swim_frame, 85)
+    ## Sensory cells for single pulse
+    ###################################   
     pulse_trial = []
     pulse_type = []
-
     pulse_motor_trial = []
     pulse_motor_type = []
-
     nopulse_trial = []
     nopulse_type = []
 
-    pulse_amp = probe_amp #np.unique(pulse_frame)[1]
-    print(np.unique(pulse_frame), probe_amp)
     pulse_on = np.where((pulse_frame[:-1]==0) & (pulse_frame[1:]==pulse_amp))[0]+1
-    num_dff = dFF.shape[-1]
     pulse_on = pulse_on[pulse_on<num_dff-10]
 
     for n, trial in enumerate(pulse_on):
@@ -126,18 +164,16 @@ def bar_code(row):
             pulse_motor_trial.append(trial)
             pulse_motor_type.append(epoch_frame[trial]//5)
 
-    nopulse_on = epoch_frame%5==4
-    nopulse_on = np.where((~nopulse_on[:-1]) & nopulse_on[1:])[0]+1
-    nopulse_on = nopulse_on[nopulse_on<num_dff-10]
-
-    for n, trial in enumerate(nopulse_on):
-        swim_ = np.clip(swim_frame[trial+3:trial+10]-swim_thres, 0, np.inf)
-        if swim_.sum()==0:
-            nopulse_trial.append(trial)
-            nopulse_type.append(epoch_frame[trial]//5)
+    trial_len_ = 7
+    for n, trial in enumerate(mlt_nopulse_on):
+        for m in range(8):
+            swim_ = np.clip(swim_frame[trial+m*trial_len_-2:trial+m*trial_len_+5]-swim_thres, 0, np.inf)
+            if swim_.sum()==0:
+                nopulse_trial.append(trial+m*trial_len_-2)
+                nopulse_type.append(epoch_frame[trial+m*trial_len_]//5)
 
     if len(pulse_trial)>0:
-        cell_sensory_stats = dFF_.map_blocks(pulse_stats_chunks, pulse_trial=pulse_trial, nopulse_trial=nopulse_trial, dtype='O').compute()  
+        cell_sensory_stats = dFF_.map_blocks(pulse_stats_chunks, pulse_trial=pulse_trial, nopulse_trial=nopulse_trial, dtype='O').compute() 
         np.savez(save_root+'cell_type_stats_sensory', cell_sensory_stats=cell_sensory_stats)
 
     if (len(pulse_motor_trial)>0) and (probe_gain==0):
@@ -179,8 +215,8 @@ def bar_code(row):
 
     swim_lens = (swim_on[1:] - swim_on[:-1])
     swim_lens = np.r_[swim_lens, np.inf]
-    swim_on = swim_on[swim_lens>=7]
-    swim_off = swim_off[swim_lens>=7]
+    swim_on = swim_on[swim_lens>=10]
+    swim_off = swim_off[swim_lens>=10]
     swim_len = (swim_on[1:] - swim_on[:-1]).min()
     pre_len = 2
 
@@ -191,7 +227,7 @@ def bar_code(row):
             swim_trial.append(on_)
             swim_type.append(type_[0])
 
-    off_set = 5
+    off_set = 9
     for n, off_ in enumerate(swim_off[:-1]):
         if swim_on[n+1]-off_<(off_set*2+pre_len+swim_len):
             continue
@@ -220,28 +256,49 @@ def bar_code(row):
     ###################################
     ## passive cells
     ###################################
-
     swim_thres = max(np.percentile(swim_frame, 85), 0.2)
     active_pulse_trial = []
     passive_pulse_trial = []
+    epoch_on = np.where((epoch_frame[1:]%5==0) & (epoch_frame[:-1]%5>0))[0]+1
+    epoch_on = np.r_[0, epoch_on, len(epoch_frame)]
+    t_pre = 5
+    t_post = 50
+    passive_trial = []
+    for n_ in range(len(epoch_on)-1):
+        on_ = epoch_on[n_]
+        off_ = epoch_on[n_+1]
+        swim_ = np.clip(swim_frame[on_:off_]-swim_thres, 0, np.inf)
+        epoch_ = epoch_frame[on_:off_]
+        pulse_ = pulse_frame[on_:off_]
+        if (epoch_%5==3).sum()<120:
+            continue
+        if swim_[epoch_%5==0].sum()==0:
+            continue
+        if swim_[epoch_%5==1].sum()==0:
+            continue
+        swim_len_ = np.where(swim_[epoch_%5==1]>0)[0]
+        swim_len_ = swim_len_.max() - swim_len_.min()
+        if swim_len_<10:
+            continue
+        if swim_[epoch_%5==2][5:].sum()>0:
+            plt.plot(swim_[epoch_%5==2])
+            plt.show()
+            continue
+        trial_type_ = epoch_[0]//5
+        pulse_on_ = np.where(pulse_==pulse_amp)[0]
+        if len(pulse_on_)==0: # skip catch trials
+            continue
+        pulse_on_ = pulse_on_[0]
+        if swim_[pulse_on_-t_pre:pulse_on_+t_post].sum()>0:
+            continue
+        passive_trial.append([trial_type_, pulse_on_+on_])
+    passive_trial=np.array(passive_trial).astype('int')
 
-    active_on = np.where((epoch_frame[1:]==3) & (epoch_frame[:-1]==2))[0]+1
-    passive_on = np.where((epoch_frame[1:]==8) & (epoch_frame[:-1]==7))[0]+1
-    post_ = 50
-    pre_ = 2
-
-    for n, trial in enumerate(active_on):
-        swim_ = np.clip(swim_frame[trial-pre_:trial+post_]-swim_thres, 0, np.inf)
-        if swim_.sum()==0:
-            active_pulse_trial.append(trial)
-
-    for n, trial in enumerate(passive_on):
-        swim_ = np.clip(swim_frame[trial-pre_:trial+post_]-swim_thres, 0, np.inf)
-        if swim_.sum()==0:
-            passive_pulse_trial.append(trial)
+    active_pulse_trial = passive_trial[passive_trial[:,0]==0, 1]
+    passive_pulse_trial = passive_trial[passive_trial[:,0]==1, 1]
 
     if (len(active_pulse_trial)>0) and (len(passive_pulse_trial)>0):
-        cell_active_pulse_stats = dFF_.map_blocks(comp_stats_chunks, cond_trial=active_pulse_trial, comp_trial=passive_pulse_trial, pre=pre_, post=post_, dtype='O').compute()  
+        cell_active_pulse_stats = dFF_.map_blocks(comp_stats_chunks, cond_trial=active_pulse_trial, comp_trial=passive_pulse_trial, pre=t_pre, post=t_post, dtype='O').compute()  
         np.savez(save_root+'cell_active_pulse_stats', cell_active_pulse_stats=cell_active_pulse_stats)
 
     fdask.terminate_workers(cluster, client)
