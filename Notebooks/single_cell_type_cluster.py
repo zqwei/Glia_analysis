@@ -12,7 +12,7 @@ from fish_proc.utils.memory import clear_variables
 from fish_proc.utils import dask_ as fdask
 
 
-def bar_code(row):
+def sensory_motor_bar_code(row):
     save_root = row['save_dir']+'/'
     # check ephys data
     dat_dir = row['dat_dir'].replace('/im/', '/')
@@ -252,6 +252,12 @@ def bar_code(row):
     if len(swim_trial_)>0:
         cell_motor_stats = dFF_.map_blocks(motor_stats_chunks, swim_trial=swim_trial_, noswim_trial=noswim_trial, swim_len=swim_len, pre_len=pre_len, dtype='O').compute() 
         np.savez(save_root+'cell_type_stats_motor', cell_motor_stats=cell_motor_stats)
+        
+    fdask.terminate_workers(cluster, client)
+    return None
+
+
+
 
     ###################################
     ## passive cells
