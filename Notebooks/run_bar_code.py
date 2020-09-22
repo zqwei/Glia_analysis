@@ -9,7 +9,6 @@ for ind, row in df.iterrows():
         continue
     if not os.path.exists(save_root+'brain_seg_factors.npz'):
         continue
-#     if os.path.exists(save_root+'cell_active_pulse_stats.npz'):
-#         continue  
-    print(save_root, row['taskType'])
-    bar_code(row)
+    print(row['save_dir'])
+    if not os.path.exists(save_root+'cell_type_stats_motor.npz'):
+        sensory_motor_bar_code(row)
