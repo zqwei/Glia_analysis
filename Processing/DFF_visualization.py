@@ -47,7 +47,12 @@ for ind, row in df.iterrows():
         A_loc = A_loc[valid_cell]
         F_ = F_[valid_cell]
         F_dask = da.from_array(F_, chunks=('auto', -1))
-        baseline_ = da.map_blocks(fwc.baseline, F_dask, dtype='float', window=400, percentile=20, downsample=10).compute()
+        if row['singlePlane']:
+            win_ = 5000
+        else:
+            win_ = 400
+        print(win_)
+        baseline_ = da.map_blocks(fwc.baseline, F_dask, dtype='float', window=win_, percentile=20, downsample=10).compute()
         dFF = F_/baseline_-1
         invalid_ = (dFF.max(axis=-1)>5) | (np.isnan(dFF.max(axis=-1))) | (baseline_.min(axis=-1)<=0)
         np.savez(save_root+'cell_dff.npz', A=A[~invalid_].astype('float16'), A_loc=A_loc[~invalid_], dFF=dFF[~invalid_].astype('float16'))
