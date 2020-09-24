@@ -1,4 +1,5 @@
-from single_cell_type_cluster import *
+import os
+import pandas as pd
 
 df = pd.read_csv('../Processing/data_list.csv')
 # df = pd.read_csv('../Processing/datasets.csv')
@@ -10,6 +11,9 @@ for ind, row in df.iterrows():
     dat_dir = dat_dir+'/'
     p_dir = dat_dir + 'processed/'
     ephys_dir = dat_dir + 'ephys/'
+    save_root = row['save_dir']
+    if not os.path.exists(save_root+'brain_seg_factors.npz'):
+        continue
     if not os.path.exists(row['dat_dir']):
         print(row['dat_dir'])
     if not os.path.exists(ephys_dir):
