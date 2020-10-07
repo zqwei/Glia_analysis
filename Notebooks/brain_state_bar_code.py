@@ -125,8 +125,8 @@ def brain_state_bar_code(row):
         if (epoch_%5==3).sum()<120:
             continue
         ## remove the trial without swim during rest epoch
-        if swim_[epoch_%5==0].sum()==0:
-            continue
+        # if swim_[epoch_%5==0].sum()==0:
+        #     continue
         ## remove the trial without swim during evoke epoch
         if swim_[epoch_%5==1].sum()==0:
             continue
@@ -140,7 +140,7 @@ def brain_state_bar_code(row):
         
         if trial_type_==1:
             swim_len_ = np.where(swim_[epoch_%5<=2]>0)[0]
-            if (evoke_epoch_end-swim_len_[-1])<15:
+            if (evoke_epoch_end-swim_len_[-1])<14:
                 continue
         pre_swim = swim_len_[-1]
         if (swim_[pre_swim+1:]>0).sum():
