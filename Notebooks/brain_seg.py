@@ -28,18 +28,18 @@ def brain_layer_seg_factor(row, t_min=5000, t_max=30000, l_thres_=0.5, n_thres =
     dFF = _['dFF'].astype('float')[:, t_min:t_max]
     _ = None
     
-    print('========Compute cell mass center========')
-    if not os.path.exists(save_root+'cell_center.npy'):
-        A_center = np.zeros((dFF.shape[0],3))
-        (X,Y) = np.meshgrid(np.arange(100),np.arange(100))
-        for n_, A_ in enumerate(A):
-            A_loc_ = A_loc[n_]
-            z, x, y = A_loc_
-            A_[A_<A_.max()*0.4]=0
-            cx = (X*A_).sum()/A_.sum()
-            cy = (Y*A_).sum()/A_.sum()
-            A_center[n_]=np.array([z, x+cx, y+cy])
-        np.save(save_root+'cell_center.npy', A_center)
+#     print('========Compute cell mass center========')
+#     if not os.path.exists(save_root+'cell_center.npy'):
+#         A_center = np.zeros((dFF.shape[0],3))
+#         (X,Y) = np.meshgrid(np.arange(100),np.arange(100))
+#         for n_, A_ in enumerate(A):
+#             A_loc_ = A_loc[n_]
+#             z, x, y = A_loc_
+#             A_[A_<A_.max()*0.4]=0
+#             cx = (X*A_).sum()/A_.sum()
+#             cy = (Y*A_).sum()/A_.sum()
+#             A_center[n_]=np.array([z, x+cx, y+cy])
+#         np.save(save_root+'cell_center.npy', A_center)
     A_center = np.load(save_root+'cell_center.npy')
     
     num_z=A_center[:,0].max().astype('int')
