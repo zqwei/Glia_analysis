@@ -13,13 +13,13 @@ for ind, row in df.iterrows():
         continue
     print(row['save_dir'])
     # visual vs motor
-    if not os.path.exists(row['save_dir']+'/'+'sensory_motor_bar_code.done'):
-        sensory_motor_bar_code(row)
-        Path(row['save_dir']+'/'+'sensory_motor_bar_code_raw.done').touch()
+#     if not os.path.exists(row['save_dir']+'/'+'sensory_motor_bar_code.done'):
+    sensory_motor_bar_code(row)
+    Path(row['save_dir']+'/'+'sensory_motor_bar_code_raw.done').touch()
     # state-depdendent swim
-    if not os.path.exists(row['save_dir']+'/'+'brain_state_bar_code.done'):
-        brain_state_bar_code(row)
-        Path(row['save_dir']+'/'+'brain_state_bar_code.done').touch()
+#     if not os.path.exists(row['save_dir']+'/'+'brain_state_bar_code.done'):
+    brain_state_bar_code(row)
+    Path(row['save_dir']+'/'+'brain_state_bar_code.done').touch()
     # state-depdendent visual
 #     if not os.path.exists(row['save_dir']+'/'+'brain_state_bar_code_raw.done'):
 #         brain_state_bar_code_raw(row)
