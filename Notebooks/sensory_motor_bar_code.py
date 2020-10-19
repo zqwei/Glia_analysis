@@ -2,7 +2,6 @@ from sensory_motor_single_cell_class import *
 from utils import *
 from brain_seg import brain_seg_factor
 from factor import thres_factor_
-from brain_segment_vis import *
 from swim_ephys import *
 from kernel_fit import *
 from scipy.stats import spearmanr
