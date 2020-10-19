@@ -11,6 +11,7 @@ import zarr
 from fish_proc.utils.memory import clear_variables
 from fish_proc.utils import dask_ as fdask
 from sensory_motor_single_cell_class import open_ephys_metadata
+brain_map_thres = 1
 
 
 def brain_state_bar_code_raw(row):
@@ -41,7 +42,7 @@ def brain_state_bar_code_raw(row):
     for n_layer in range(brain_map.shape[0]):
         layer_ = A_center[:, 0]==n_layer
         cell_ids = np.where(layer_)[0]
-        mask_ = brain_map[n_layer]>2
+        mask_ = brain_map[n_layer]>brain_map_thres
         y = A_center_grid[cell_ids, 2]
         x = A_center_grid[cell_ids, 1]
         x_max, y_max = mask_.shape

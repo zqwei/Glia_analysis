@@ -10,7 +10,7 @@ import dask.array as da
 import zarr
 from fish_proc.utils.memory import clear_variables
 from fish_proc.utils import dask_ as fdask
-
+brain_map_thres = 1
 
 def sensory_motor_bar_code(row):
     save_root = row['save_dir']+'/'
@@ -39,7 +39,7 @@ def sensory_motor_bar_code(row):
     for n_layer in range(brain_map.shape[0]):
         layer_ = A_center[:, 0]==n_layer
         cell_ids = np.where(layer_)[0]
-        mask_ = brain_map[n_layer]>2
+        mask_ = brain_map[n_layer]>brain_map_thres
         y = A_center_grid[cell_ids, 2]
         x = A_center_grid[cell_ids, 1]
         x_max, y_max = mask_.shape
