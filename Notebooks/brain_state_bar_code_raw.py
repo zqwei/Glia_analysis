@@ -135,12 +135,17 @@ def brain_state_bar_code_raw(row):
         evoke_epoch_end = np.where(epoch_%5==1)[0][-1]
         if trial_type_==0:
             swim_len_ = np.where(swim_[epoch_%5<=2]>0)[0]
-            if (evoke_epoch_end-swim_len_[-1])>6:
-                continue
+            pulse_on_ = np.where(pulse_==pulse_amp)[0]
+            if len(pulse_on_)==0:
+                if (evoke_epoch_end-swim_len_[-1])>20:
+                    continue
+            else:
+                if (evoke_epoch_end-swim_len_[-1])>12:
+                    continue
         
         if trial_type_==1:
             swim_len_ = np.where(swim_[epoch_%5<=2]>0)[0]
-            if (evoke_epoch_end-swim_len_[-1])<14:
+            if (evoke_epoch_end-swim_len_[-1])<12: #change it from 14 to 12
                 continue
         pre_swim = swim_len_[-1]
         if (swim_[pre_swim+1:]>0).sum():
@@ -149,8 +154,6 @@ def brain_state_bar_code_raw(row):
         else:
             next_swim = np.nan
             next_swim_end = np.nan
-
-
         ### no pulse case
         pulse_on_ = np.where(pulse_==pulse_amp)[0]
         if len(pulse_on_)==0: # catch trials -- no pulse case
@@ -170,23 +173,35 @@ def brain_state_bar_code_raw(row):
             if not np.isnan(next_swim):
                 pulse_swim_trial.append([trial_type_, next_swim+on_, swim_[next_swim:next_swim_end]])
 
-    if (not os.path.exists(save_root+'cell_no_pulse_ap_stats.npz')) and (len(no_pulse_trial)>0):
+    if (not os.path.exists(save_root+'cell_no_pulse_ap_stats_raw.npz')) and (len(no_pulse_trial)>0):
         trial_ = np.array(no_pulse_trial)
         trial_type_ = trial_[:,0]
         if ((trial_type_==0).sum()>1) and ((trial_type_==1).sum()>1):
             active_ = trial_[trial_type_==0, 1:]
             passive_ = trial_[trial_type_==1, 1:]
             cell_no_pulse_ap_stats = dFF_.map_blocks(comp_pulse_stats_chunks, cond_trial=active_, comp_trial=passive_, pre=t_pre, post=t_post, dtype='O').compute()
-            np.savez(save_root+'cell_no_pulse_ap_stats', cell_no_pulse_ap_stats=cell_no_pulse_ap_stats)
+            np.savez(save_root+'cell_no_pulse_ap_stats_raw', cell_no_pulse_ap_stats=cell_no_pulse_ap_stats)
         
-    if (not os.path.exists(save_root+'cell_pulse_ap_stats.npz')) and (len(pulse_trial)>0):
+    if (not os.path.exists(save_root+'cell_pulse_ap_stats_raw.npz')) and (len(pulse_trial)>0):
+        
+        trial_ = np.array(no_pulse_trial)
+        trial_type_ = trial_[:,0]
+        if (trial_type_==0).sum()>=1:
+            active_ = trial_[trial_type_==0, 1:]
+        else:
+            active_ = None
+        if (trial_type_==1).sum()>=1:
+            passive_ = trial_[trial_type_==1, 1:]
+        else:
+            passive_ = None
+        
         trial_ = np.array(pulse_trial)
         trial_type_ = trial_[:,0]
         if ((trial_type_==0).sum()>1) and ((trial_type_==1).sum()>1):
             active_p = trial_[trial_type_==0, 1:]
             passive_p = trial_[trial_type_==1, 1:]
             cell_pulse_ap_stats = dFF_.map_blocks(comp_pulse_stats_ref_chunks, cond_trial=active_p, comp_trial=passive_p, cond_trial_ref=active_, comp_trial_ref=passive_, pre=t_pre, post=t_post, dtype='O').compute()
-            np.savez(save_root+'cell_pulse_ap_stats', cell_pulse_ap_stats=cell_pulse_ap_stats)
+            np.savez(save_root+'cell_pulse_ap_stats_raw', cell_pulse_ap_stats=cell_pulse_ap_stats)
         
     fdask.terminate_workers(cluster, client)
     return None

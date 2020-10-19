@@ -21,6 +21,7 @@ for ind, row in df.iterrows():
         brain_state_bar_code(row)
         Path(row['save_dir']+'/'+'brain_state_bar_code.done').touch()
     # state-depdendent visual
-    if not os.path.exists(row['save_dir']+'/'+'brain_state_bar_code_raw.done'):
-        brain_state_bar_code_raw(row)
-        Path(row['save_dir']+'/'+'brain_state_bar_code_raw.done').touch()
+#     if not os.path.exists(row['save_dir']+'/'+'brain_state_bar_code_raw.done'):
+#         brain_state_bar_code_raw(row)
+#         Path(row['save_dir']+'/'+'brain_state_bar_code_raw.done').touch()
+    brain_state_bar_code_raw(row)

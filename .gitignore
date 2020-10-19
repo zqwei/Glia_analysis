@@ -12,6 +12,7 @@ info
 *.tif*
 *.mp4
 results/
+analyses_in_progress/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

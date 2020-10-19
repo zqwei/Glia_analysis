@@ -70,18 +70,25 @@ def comp_pulse_stats_chunks(dff, cond_trial=None, comp_trial=None, pre=None, pos
 
 
 def comp_pulse_stats_ref(dff_, cond_trial, comp_trial, cond_trial_ref, comp_trial_ref, pre, post):
+    trend_win = 10
     dff_ = dff_.squeeze()
     num_cond = len(cond_trial)
     num_comp = len(comp_trial)
-    num_cond_ref = len(cond_trial_ref)
-    num_comp_ref = len(comp_trial_ref)
+    if cond_trial_ref is None:
+        num_cond_ref = 0
+    else:
+        num_cond_ref = len(cond_trial_ref)
+    if comp_trial_ref is None:
+        num_comp_ref = 0
+    else:
+        num_comp_ref = len(comp_trial_ref)
     dff_cond = np.empty((num_cond, pre+post))
     dff_cond[:] = np.nan
     dff_comp = np.empty((num_comp, pre+post))
     dff_comp[:] = np.nan
-    dff_cond_ref = np.empty((num_cond, pre+post))
+    dff_cond_ref = np.empty((num_cond_ref, pre+post))
     dff_cond_ref[:] = np.nan
-    dff_comp_ref = np.empty((num_comp, pre+post))
+    dff_comp_ref = np.empty((num_comp_ref, pre+post))
     dff_comp_ref[:] = np.nan
     
     valid_ = np.zeros(num_cond).astype('bool')
@@ -95,17 +102,18 @@ def comp_pulse_stats_ref(dff_, cond_trial, comp_trial, cond_trial_ref, comp_tria
     dff_cond = dff_cond[valid_]    
     
     valid_ = np.zeros(num_cond_ref).astype('bool')
-    for n, (trial, trial_end) in enumerate(cond_trial_ref):
-        if len(dff_[trial-pre:trial+post])==(pre+post):
-            if trial_end<0:
-                dff_cond_ref[n] = dff_[trial-pre:trial+post]
-            else:
-                dff_cond_ref[n, :trial_end-trial+pre] = dff_[trial-pre:trial_end]
-            valid_[n] = True
-    dff_cond_ref = dff_cond_ref[valid_]
+    if num_cond_ref>0:
+        for n, (trial, trial_end) in enumerate(cond_trial_ref):
+            if len(dff_[trial-pre:trial+post])==(pre+post):
+                if trial_end<0:
+                    dff_cond_ref[n] = dff_[trial-pre:trial+post]
+                else:
+                    dff_cond_ref[n, :trial_end-trial+pre] = dff_[trial-pre:trial_end]
+                valid_[n] = True
+        dff_cond_ref = dff_cond_ref[valid_]
     if valid_.sum()>0:
         trend = np.nanmean(dff_cond_ref, axis=0)
-        trend = moving_average(trend, 4)[None, :]
+        trend = moving_average(trend, trend_win)[None, :]
         dff_cond_ = dff_cond - trend
     else:
         dff_cond_ = dff_cond
@@ -121,17 +129,18 @@ def comp_pulse_stats_ref(dff_, cond_trial, comp_trial, cond_trial_ref, comp_tria
     dff_comp = dff_comp[valid_]
     
     valid_ = np.zeros(num_comp_ref).astype('bool')
-    for n, (trial, trial_end) in enumerate(comp_trial_ref):
-        if len(dff_[trial-pre:trial+post])==(pre+post):
-            if trial_end<0:
-                dff_comp_ref[n] = dff_[trial-pre:trial+post]
-            else:
-                dff_comp_ref[n, :trial_end-trial+pre] = dff_[trial-pre:trial_end]
-            valid_[n] = True
-    dff_comp_ref = dff_comp_ref[valid_]
+    if num_comp_ref>0:
+        for n, (trial, trial_end) in enumerate(comp_trial_ref):
+            if len(dff_[trial-pre:trial+post])==(pre+post):
+                if trial_end<0:
+                    dff_comp_ref[n] = dff_[trial-pre:trial+post]
+                else:
+                    dff_comp_ref[n, :trial_end-trial+pre] = dff_[trial-pre:trial_end]
+                valid_[n] = True
+        dff_comp_ref = dff_comp_ref[valid_]
     if valid_.sum()>0:
         trend = np.nanmean(dff_comp_ref, axis=0)
-        trend = moving_average(trend, 4)[None, :]
+        trend = moving_average(trend, trend_win)[None, :]
         dff_comp_ = dff_comp - trend
     else:
         dff_comp_ = dff_comp
@@ -143,7 +152,7 @@ def comp_pulse_stats_ref(dff_, cond_trial, comp_trial, cond_trial_ref, comp_tria
         if (n_valid_cond.sum()>0) and (n_valid_comp.sum()>0):
             _, p_vec[0, n] = ranksums(dff_cond[n_valid_cond, n], dff_comp[n_valid_comp, n])
         else:
-            _, p_vec[0, n] = 1
+            p_vec[0, n] = 1
         try:
             _, p_vec[1, n] = wilcoxon(dff_cond[n_valid_cond, n])
         except:
@@ -160,7 +169,7 @@ def comp_pulse_stats_ref(dff_, cond_trial, comp_trial, cond_trial_ref, comp_tria
         if (n_valid_cond.sum()>0) and (n_valid_comp.sum()>0):
             _, p_vec_[0, n] = ranksums(dff_cond_[n_valid_cond, n], dff_comp_[n_valid_comp, n])
         else:
-            _, p_vec_[0, n] = 1
+            p_vec_[0, n] = 1
         try:
             _, p_vec_[1, n] = wilcoxon(dff_cond_[n_valid_cond, n])
         except:
