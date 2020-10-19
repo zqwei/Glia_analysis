@@ -6,7 +6,6 @@ def cell_location(row):
     save_root = row['save_dir']+'/'
     print('Processing data at: '+row['dat_dir'])
     print('Saving at: '+save_root)
-    
     brain_map = np.load(save_root+'Y_ave.npy').astype('float').squeeze()    
     _ = np.load(save_root+'cell_dff.npz', allow_pickle=True)
     A = _['A']
@@ -27,4 +26,7 @@ def cell_location(row):
 if __name__ == "__main__":
     df = pd.read_csv('../Processing/data_list_in_analysis.csv')
     for ind, row in df.iterrows():
+        save_root = row['save_dir']+'/'
+        if os.path.exists(save_root+'cell_center.npy'):
+            continue
         cell_location(row)
