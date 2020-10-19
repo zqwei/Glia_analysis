@@ -172,15 +172,15 @@ def sensory_motor_bar_code(row):
                 nopulse_trial.append(trial+m*trial_len_-2)
                 nopulse_type.append(epoch_frame[trial+m*trial_len_]//5)
 
-    if (not os.path.exists(save_root+'cell_type_stats_sensory.npz')) and (len(pulse_trial)>0):
+    if len(pulse_trial)>0:
         cell_sensory_stats = dFF_.map_blocks(pulse_stats_chunks, pulse_trial=pulse_trial, nopulse_trial=nopulse_trial, dtype='O').compute() 
         np.savez(save_root+'cell_type_stats_sensory', cell_sensory_stats=cell_sensory_stats)
 
-    if (not os.path.exists(save_root+'cell_type_stats_pulse_motor.npz')) and (len(pulse_motor_trial)>0) and (probe_gain==0):
+    if (len(pulse_motor_trial)>0) and (probe_gain==0):
         cell_pulse_motor_stats = dFF_.map_blocks(pulse_stats_chunks, pulse_trial=pulse_motor_trial, nopulse_trial=nopulse_trial, dtype='O').compute()
         np.savez(save_root+'cell_type_stats_pulse_motor', cell_pulse_motor_stats=cell_pulse_motor_stats)
 
-    if (not os.path.exists(save_root+'cell_comp_pulse_motor_stats_.npz')) and (len(pulse_trial)>0) and (len(pulse_motor_trial)>0) and (probe_gain==0):
+    if (len(pulse_trial)>0) and (len(pulse_motor_trial)>0) and (probe_gain==0):
         cell_comp_pulse_motor_stats = dFF_.map_blocks(comp_stats_chunks, cond_trial=pulse_trial, comp_trial=pulse_motor_trial, pre=2, post=5, dtype='O').compute()  
         np.savez(save_root+'cell_comp_pulse_motor_stats_', cell_comp_pulse_motor_stats=cell_comp_pulse_motor_stats)
 
@@ -244,12 +244,12 @@ def sensory_motor_bar_code(row):
             noswim_trial.append(on_+off_+off_set)
 
     swim_trial_ = np.array(swim_trial)[np.array(swim_type)!=6]
-    if (not os.path.exists(save_root+'cell_type_stats_sm.npz')) and len(swim_trial_)>0:
+    if len(swim_trial_)>0:
         cell_sm_stats = dFF_.map_blocks(motor_stats_chunks, swim_trial=swim_trial_, noswim_trial=noswim_trial, swim_len=swim_len, pre_len=pre_len, dtype='O').compute()
         np.savez(save_root+'cell_type_stats_sm', cell_sm_stats=cell_sm_stats)
 
     swim_trial_ = np.array(swim_trial)[np.array(swim_type)==6]
-    if (not os.path.exists(save_root+'cell_type_stats_motor.npz')) and len(swim_trial_)>0:
+    if len(swim_trial_)>0:
         cell_motor_stats = dFF_.map_blocks(motor_stats_chunks, swim_trial=swim_trial_, noswim_trial=noswim_trial, swim_len=swim_len, pre_len=pre_len, dtype='O').compute() 
         np.savez(save_root+'cell_type_stats_motor', cell_motor_stats=cell_motor_stats)
         

@@ -169,7 +169,7 @@ def brain_state_bar_code(row):
             if not np.isnan(next_swim):
                 pulse_swim_trial.append([trial_type_, next_swim+on_, swim_[next_swim:next_swim_end]])
 
-    if (not os.path.exists(save_root+'cell_no_pulse_ap_stats.npz')) and (len(no_pulse_trial)>0):
+    if len(no_pulse_trial)>0:
         trial_ = np.array(no_pulse_trial)
         trial_type_ = trial_[:,0]
         if ((trial_type_==0).sum()>1) and ((trial_type_==1).sum()>1):
@@ -178,7 +178,7 @@ def brain_state_bar_code(row):
             cell_no_pulse_ap_stats = dFF_.map_blocks(comp_pulse_stats_chunks, cond_trial=active_, comp_trial=passive_, pre=t_pre, post=t_post, dtype='O').compute()
             np.savez(save_root+'cell_no_pulse_ap_stats', cell_no_pulse_ap_stats=cell_no_pulse_ap_stats)
         
-    if (not os.path.exists(save_root+'cell_pulse_ap_stats.npz')) and (len(pulse_trial)>0):
+    if len(pulse_trial)>0:
         trial_ = np.array(pulse_trial)
         trial_type_ = trial_[:,0]
         if ((trial_type_==0).sum()>1) and ((trial_type_==1).sum()>1):
@@ -189,7 +189,7 @@ def brain_state_bar_code(row):
     
     t_pre_ = 5
     t_post_ = 10
-    if (not os.path.exists(save_root+'cell_no_swim_ap_stats.npz')) and (len(no_pulse_swim_trial)>0):
+    if len(no_pulse_swim_trial)>0:
         trial_ = np.array(no_pulse_swim_trial)
         swim_list_thres = np.percentile(np.concatenate(trial_[:,2]), 60)
         valid_ = np.array([(_<=swim_list_thres).mean()==1 for _ in trial_[:,2]])
@@ -203,7 +203,7 @@ def brain_state_bar_code(row):
             np.savez(save_root+'cell_no_swim_ap_stats', cell_no_swim_ap_stats=cell_no_swim_ap_stats)
         
     
-    if (not os.path.exists(save_root+'cell_pulse_swim_ap_stats.npz')) and (len(pulse_swim_trial)>0):
+    if len(pulse_swim_trial)>0:
         trial_ = np.array(pulse_swim_trial)
         swim_list_thres = np.percentile(np.concatenate(trial_[:,2]), 60)
         valid_ = np.array([(_<=swim_list_thres).mean()==1 for _ in trial_[:,2]])
