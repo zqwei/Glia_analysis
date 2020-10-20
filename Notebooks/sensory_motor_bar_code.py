@@ -5,11 +5,12 @@ from factor import thres_factor_
 from swim_ephys import *
 from kernel_fit import *
 from scipy.stats import spearmanr
+import shutil
 import dask.array as da
 import zarr
 from fish_proc.utils.memory import clear_variables
 from fish_proc.utils import dask_ as fdask
-brain_map_thres = 1
+brain_map_thres = 2
 
 def sensory_motor_bar_code(row):
     save_root = row['save_dir']+'/'
@@ -57,9 +58,10 @@ def sensory_motor_bar_code(row):
     cluster, client = fdask.setup_workers(numCore=numCore,is_local=False)
     fdask.print_client_links(client)
     print(client.dashboard_link)
-    if not os.path.exists(save_root+'cell_dff.zarr'):
-        dFF_ = zarr.array(dFF, chunks=(dFF.shape[0]//(numCore-2), dFF.shape[1]))
-        zarr.save(save_root+'cell_dff.zarr', dFF_)
+    if os.path.exists(save_root+'cell_dff.zarr'):
+        shutil.rmtree(save_root+'cell_dff.zarr')
+    dFF_ = zarr.array(dFF, chunks=(dFF.shape[0]//(numCore-2), dFF.shape[1]))
+    zarr.save(save_root+'cell_dff.zarr', dFF_)
     dFF_ = da.from_zarr(save_root+'cell_dff.zarr')
     clear_variables(dFF)
 
@@ -137,9 +139,8 @@ def sensory_motor_bar_code(row):
             mlt_nopulse_trial.append(trial)
             mlt_nopulse_type.append(epoch_frame[trial]//5)
     
-    if not os.path.exists(save_root+'cell_type_stats_msensory.npz'):
-        cell_msensory_stats = dFF_.map_blocks(multi_pulse_stats_chunks, pulse_trial=mlt_pulse_trial, nopulse_trial=mlt_nopulse_trial, t_pre=t_pre, t_post=t_post, dtype='O').compute() 
-        np.savez(save_root+'cell_type_stats_msensory', cell_msensory_stats=cell_msensory_stats)
+    cell_msensory_stats = dFF_.map_blocks(multi_pulse_stats_chunks, pulse_trial=mlt_pulse_trial, nopulse_trial=mlt_nopulse_trial, t_pre=t_pre, t_post=t_post, dtype='O').compute() 
+    np.savez(save_root+'cell_type_stats_msensory', cell_msensory_stats=cell_msensory_stats)
     
     
     ###################################

@@ -10,7 +10,7 @@ import zarr
 from fish_proc.utils.memory import clear_variables
 from fish_proc.utils import dask_ as fdask
 from sensory_motor_single_cell_class import open_ephys_metadata
-brain_map_thres = 1
+brain_map_thres = 2
 
 
 def brain_state_bar_code_raw(row):
