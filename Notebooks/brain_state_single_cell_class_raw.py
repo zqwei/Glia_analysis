@@ -70,7 +70,7 @@ def comp_pulse_stats_chunks(dff, cond_trial=None, comp_trial=None, pre=None, pos
 
 
 def comp_pulse_stats_ref(dff_, cond_trial, comp_trial, cond_trial_ref, comp_trial_ref, pre, post):
-    trend_win = 10
+    trend_win = 4
     dff_ = dff_.squeeze()
     num_cond = len(cond_trial)
     num_comp = len(comp_trial)

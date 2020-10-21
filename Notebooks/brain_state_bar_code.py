@@ -28,41 +28,14 @@ def brain_state_bar_code(row):
     _ = np.load(save_root+'cell_dff.npz', allow_pickle=True)
     A = _['A']
     A_loc = _['A_loc']
-    dFF = _['dFF'].astype('float')
-    num_dff = dFF.shape[-1]
+    num_dff = _['dFF'].shape[-1]
     _ = None
-
-    brain_map = np.load(save_root+'Y_ave.npy').astype('float').squeeze()
-    A_center = np.load(save_root+'cell_center.npy')
-    A_center_grid = np.round(A_center).astype('int')
-    cells_in_mask = []
-
-    for n_layer in range(brain_map.shape[0]):
-        layer_ = A_center[:, 0]==n_layer
-        cell_ids = np.where(layer_)[0]
-        mask_ = brain_map[n_layer]>brain_map_thres
-        y = A_center_grid[cell_ids, 2]
-        x = A_center_grid[cell_ids, 1]
-        x_max, y_max = mask_.shape
-        num_cells = len(cell_ids)
-        in_mask_ = np.zeros(num_cells).astype('bool')
-        for n in range(num_cells):
-            if (x[n]<x_max) and (y[n]<y_max):
-                in_mask_[n] = mask_[x[n], y[n]]
-        cells_in_mask.append(cell_ids[in_mask_])
-    cells_in_mask = np.concatenate(cells_in_mask)
-    A_center = A_center[cells_in_mask]
-    dFF = dFF[cells_in_mask]
-
+    
     numCore = 450
     cluster, client = fdask.setup_workers(numCore=numCore,is_local=False)
     fdask.print_client_links(client)
     print(client.dashboard_link)
-    if not os.path.exists(save_root+'cell_dff.zarr'):
-        dFF_ = zarr.array(dFF, chunks=(dFF.shape[0]//(numCore-2), dFF.shape[1]))
-        zarr.save(save_root+'cell_dff.zarr', dFF_)
     dFF_ = da.from_zarr(save_root+'cell_dff.zarr')
-    clear_variables(dFF)
 
     ###################################
     ## Downsample sensory and motor input to frames
