@@ -152,16 +152,19 @@ def brain_state_bar_code_raw(row):
             np.savez(save_root+'cell_no_pulse_ap_stats_raw', cell_no_pulse_ap_stats=cell_no_pulse_ap_stats)
         
     if len(pulse_trial)>0:
-        
-        trial_ = np.array(no_pulse_trial)
-        trial_type_ = trial_[:,0]
-        if (trial_type_==0).sum()>=1:
-            active_ = trial_[trial_type_==0, 1:]
+        if len(no_pulse_trial)>0:
+            trial_ = np.array(no_pulse_trial)
+            trial_type_ = trial_[:,0]
+            if (trial_type_==0).sum()>=1:
+                active_ = trial_[trial_type_==0, 1:]
+            else:
+                active_ = None
+            if (trial_type_==1).sum()>=1:
+                passive_ = trial_[trial_type_==1, 1:]
+            else:
+                passive_ = None
         else:
             active_ = None
-        if (trial_type_==1).sum()>=1:
-            passive_ = trial_[trial_type_==1, 1:]
-        else:
             passive_ = None
         
         trial_ = np.array(pulse_trial)

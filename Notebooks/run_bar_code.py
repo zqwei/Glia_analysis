@@ -12,6 +12,8 @@ for ind, row in df.iterrows():
     if not os.path.exists(save_root+'brain_seg_factors.npz'):
         continue
     print(row['save_dir'])
+#     if ind<7:
+#         continue
     # visual vs motor
 #     if not os.path.exists(row['save_dir']+'/'+'sensory_motor_bar_code.done'):
 #     sensory_motor_bar_code(row)
