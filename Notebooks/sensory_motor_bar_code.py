@@ -10,7 +10,7 @@ import dask.array as da
 import zarr
 from fish_proc.utils.memory import clear_variables
 from fish_proc.utils import dask_ as fdask
-brain_map_thres = 2
+
 
 def sensory_motor_bar_code(row):
     save_root = row['save_dir']+'/'
