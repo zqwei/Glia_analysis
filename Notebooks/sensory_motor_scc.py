@@ -1,11 +1,4 @@
 import numpy as np
-import os, sys
-import matplotlib.pyplot as plt
-import warnings
-warnings.filterwarnings('ignore')
-import pandas as pd
-from fish_proc.utils.np_mp import parallel_to_single
-from tqdm import tqdm
 from scipy.stats import ranksums, wilcoxon
 from statsmodels.multivariate.manova import MANOVA
 
