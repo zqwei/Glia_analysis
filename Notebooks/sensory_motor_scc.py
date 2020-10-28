@@ -20,14 +20,14 @@ def pulse_stats(dff_, pulse_trial, nopulse_trial):
     valid_ = np.zeros(num_pulse).astype('bool')
     for n, trial in enumerate(pulse_trial):
         if len(dff_[trial-2:trial+5])==7:
-            dff_pulse[n] = dff_[trial-2:trial+5]
+            dff_pulse[n] = dff_[trial-2:trial+5] - dff_[trial-2:trial].mean()
             valid_[n] = True
     dff_pulse = dff_pulse[valid_]
     
     valid_ = np.zeros(num_nopulse).astype('bool')
     for n, trial in enumerate(nopulse_trial):
         if len(dff_[trial+3:trial+10])==7:
-            dff_nopulse[n] = dff_[trial+3:trial+10]
+            dff_nopulse[n] = dff_[trial+3:trial+10] - dff_[trial+3:trial+5].mean() 
             valid_[n] = True
     dff_nopulse = dff_nopulse[valid_]
     
@@ -78,7 +78,7 @@ def multi_pulse_stats(dff_, pulse_trial, nopulse_trial, t_pre, t_post):
     valid_ = np.zeros(num_pulse).astype('bool')
     for n, trial in enumerate(pulse_trial):
         if len(dff_[trial-t_pre:trial+t_post])==trial_len_:
-            dff_pulse[n] = dff_[trial-t_pre:trial+t_post]
+            dff_pulse[n] = dff_[trial-t_pre:trial+t_post] - dff_[trial-t_pre:trial].mean()
             valid_[n] = True
     dff_pulse = dff_pulse[valid_]
     if valid_.sum()==0:
@@ -87,7 +87,7 @@ def multi_pulse_stats(dff_, pulse_trial, nopulse_trial, t_pre, t_post):
     valid_ = np.zeros(num_nopulse).astype('bool')
     for n, trial in enumerate(nopulse_trial):
         if len(dff_[trial-t_pre:trial+t_post])==trial_len_:
-            dff_nopulse[n] = dff_[trial-t_pre:trial+t_post]
+            dff_nopulse[n] = dff_[trial-t_pre:trial+t_post] - dff_[trial-t_pre:trial].mean() 
             valid_[n] = True
     dff_nopulse = dff_nopulse[valid_]
     if valid_.sum()==0:
@@ -139,14 +139,14 @@ def motor_stats(dff_, swim_trial, noswim_trial, swim_len, pre_len):
     valid_ = np.zeros(num_swim).astype('bool')
     for n, trial in enumerate(swim_trial):
         if len(dff_[trial-pre_len:trial+swim_len])==(pre_len+swim_len):
-            dff_swim[n] = dff_[trial-pre_len:trial+swim_len]
+            dff_swim[n] = dff_[trial-pre_len:trial+swim_len] - dff_[(trial-pre_len):trial].mean()
             valid_[n] = True
     dff_swim = dff_swim[valid_]
     
     valid_ = np.zeros(num_noswim).astype('bool')
     for n, trial in enumerate(noswim_trial):
         if len(dff_[trial:trial+pre_len+swim_len])==(pre_len+swim_len):
-            dff_noswim[n] = dff_[trial:trial+pre_len+swim_len]
+            dff_noswim[n] = dff_[trial:trial+pre_len+swim_len] - dff_[(trial):(trial+pre_len)].mean()
             valid_[n] = True
     dff_noswim = dff_noswim[valid_]
     
@@ -211,14 +211,14 @@ def comp_stats(dff_, cond_trial, comp_trial, pre, post):
     valid_ = np.zeros(num_cond).astype('bool')
     for n, trial in enumerate(cond_trial):
         if len(dff_[trial-pre:trial+post])==(pre+post):
-            dff_cond[n] = dff_[trial-pre:trial+post]
+            dff_cond[n] = dff_[trial-pre:trial+post] - dff_[trial-pre:trial].mean()
             valid_[n] = True
     dff_cond = dff_cond[valid_]
     
     valid_ = np.zeros(num_comp).astype('bool')
     for n, trial in enumerate(comp_trial):
         if len(dff_[trial-pre:trial+post])==(pre+post):
-            dff_comp[n] = dff_[trial-pre:trial+post]
+            dff_comp[n] = dff_[trial-pre:trial+post] - dff_[trial-pre:trial].mean()
             valid_[n] = True
     dff_comp = dff_comp[valid_]
     
@@ -246,27 +246,6 @@ def comp_stats(dff_, cond_trial, comp_trial, pre, post):
         p_manova = None
     
     return np.array([p_mean, p_vec, p_manova, dff_cond.mean(axis=0), dff_comp.mean(axis=0)])[None,:],
-
-
-def open_ephys_metadata(xml):
-    import xml.etree.ElementTree as et
-    import collections
-    import pandas as pd
-    def tryfloat (x):
-        try: return float(x)
-        except: return(x)
-    tree = et.parse(xml)
-    root = tree.getroot()
-    StimConds = []
-    for r in root.getchildren():
-        StimCond = collections.OrderedDict()
-        for e in r:
-            StimCond[e.tag] = (tryfloat(e.text))
-        StimConds.append(StimCond)
-    columns = list(StimConds[0].keys())
-    columns.remove('epoch')
-    index = [s['epoch'] for s in StimConds]
-    return pd.DataFrame(StimConds, index=index, columns=columns)
 
 
 def comp_stats_chunks(dff, cond_trial=None, comp_trial=None, pre=None, post=None):

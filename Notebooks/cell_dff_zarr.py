@@ -23,4 +23,5 @@ def cell_dff_zarr(row):
 if __name__ == "__main__":
     df = pd.read_csv('../Processing/data_list_in_analysis.csv')
     for ind, row in df.iterrows():
-        cell_dff_zarr(row)
+        if not os.path.exists(save_root+'cell_dff.zarr'):
+            cell_dff_zarr(row)

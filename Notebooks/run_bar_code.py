@@ -1,6 +1,5 @@
-from sensory_motor_bar_code import *
-from brain_state_bar_code import *
-from brain_state_bar_code_raw import *
+from sensory_motor_bc import *
+from brain_state_bcr import *
 from pathlib import Path
 
 df = pd.read_csv('../Processing/data_list_in_analysis.csv')

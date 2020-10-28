@@ -82,26 +82,22 @@ def wrap_data(x, indx, len_):
     return x_
 
 
-# def covariance_gufunc(x, y):
-#     return ((x - x.mean(axis=-1, keepdims=True))
-#             * (y - y.mean(axis=-1, keepdims=True))).mean(axis=-1)
-
-
-# def pearson_correlation_gufunc(x, y):
-#     return covariance_gufunc(x, y) / (x.std(axis=-1) * y.std(axis=-1))
-
-
-# def spearman_correlation_gufunc(x, y):
-#     from bottleneck import rankdata
-#     x_ranks = rankdata(x, axis=-1)
-#     y_ranks = rankdata(y, axis=-1)
-#     return pearson_correlation_gufunc(x_ranks, y_ranks)
-
-
-# def spearman_correlation(x, y, dim):
-#     import xarray as xr
-#     return xr.apply_ufunc(
-#         spearman_correlation_gufunc, x, y,
-#         input_core_dims=[[dim], [dim]],
-#         dask='parallelized',
-#         output_dtypes=[float])
+def open_ephys_metadata(xml):
+    import xml.etree.ElementTree as et
+    import collections
+    import pandas as pd
+    def tryfloat (x):
+        try: return float(x)
+        except: return(x)
+    tree = et.parse(xml)
+    root = tree.getroot()
+    StimConds = []
+    for r in root.getchildren():
+        StimCond = collections.OrderedDict()
+        for e in r:
+            StimCond[e.tag] = (tryfloat(e.text))
+        StimConds.append(StimCond)
+    columns = list(StimConds[0].keys())
+    columns.remove('epoch')
+    index = [s['epoch'] for s in StimConds]
+    return pd.DataFrame(StimConds, index=index, columns=columns)
