@@ -1,14 +1,7 @@
-from sensory_motor_single_cell_class import *
+from sensory_motor_scc import *
 from utils import *
-from brain_seg import brain_seg_factor
-from factor import thres_factor_
 from swim_ephys import *
-from kernel_fit import *
-from scipy.stats import spearmanr
-import shutil
 import dask.array as da
-import zarr
-from fish_proc.utils.memory import clear_variables
 from fish_proc.utils import dask_ as fdask
 
 
