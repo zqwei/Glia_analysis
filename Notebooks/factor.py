@@ -8,7 +8,8 @@ def factor_(dFF, n_c=10, noise_thres=0.8):
     FA_=FactorAnalysis(n_components=n_c, svd_method='randomized', random_state=None, iterated_power=7)
     # first fitting with all neurons
     FA_.fit(dFFz.T)
-    valid_cell=FA_.noise_variance_<noise_thres
+    var_ = dFFz.var(axis=-1)
+    valid_cell=FA_.noise_variance_/var_<noise_thres
     # second fitting with less-noisy neurons
     if valid_cell.sum()>10:
         FA_.fit(dFFz[valid_cell].T)
