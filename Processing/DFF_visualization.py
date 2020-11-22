@@ -11,7 +11,7 @@ import fish_proc.wholeBrainDask.cellProcessing_single_WS as fwc
 from fish_proc.utils.fileio import make_tarfile, chmod
 import dask.array as da
 import pandas as pd
-df = pd.read_csv('../Processing/data_list.csv')
+df = pd.read_csv('../Processing/data_list_in_analysis.csv')
 dask_tmp = '/scratch/weiz/dask-worker-space'
 memory_limit = 0 # unlimited
 
