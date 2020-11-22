@@ -10,10 +10,8 @@ def brain_layer_seg_factor(row, t_min=5000, t_max=30000, l_thres_=0.5, n_thres =
     brain_map = np.load(save_root+'Y_ave.npy').astype('float').squeeze()
     trans_ = np.load(save_root+'trans_affs.npy')
     processed_dir = row['dat_dir'] + 'processed/'
-    
-    if t_min>(trans_.shape[0]//4*3):
-        t_min = 0
-    t_max=np.min([t_max, trans_.shape[0]//4*3])
+    t_min = 0
+    t_max=np.min([t_max, trans_.shape[0]]).astype('int')
     
     plt.figure(figsize=(4, 3))
     plt.plot(trans_[t_min:t_max, 1, -1])
@@ -27,20 +25,26 @@ def brain_layer_seg_factor(row, t_min=5000, t_max=30000, l_thres_=0.5, n_thres =
     A_loc = _['A_loc']
     dFF = _['dFF'].astype('float')[:, t_min:t_max]
     _ = None
-    
-#     print('========Compute cell mass center========')
-#     if not os.path.exists(save_root+'cell_center.npy'):
-#         A_center = np.zeros((dFF.shape[0],3))
-#         (X,Y) = np.meshgrid(np.arange(100),np.arange(100))
-#         for n_, A_ in enumerate(A):
-#             A_loc_ = A_loc[n_]
-#             z, x, y = A_loc_
-#             A_[A_<A_.max()*0.4]=0
-#             cx = (X*A_).sum()/A_.sum()
-#             cy = (Y*A_).sum()/A_.sum()
-#             A_center[n_]=np.array([z, x+cx, y+cy])
-#         np.save(save_root+'cell_center.npy', A_center)
     A_center = np.load(save_root+'cell_center.npy')
+    A_center_grid = np.round(A_center).astype('int')
+    # mask out the cells
+    cells_in_mask = []
+    for n_layer in range(brain_map.shape[0]):
+        layer_ = A_center[:, 0]==n_layer
+        cell_ids = np.where(layer_)[0]
+        mask_ = brain_map[n_layer]>2
+        y = A_center_grid[cell_ids, 2]
+        x = A_center_grid[cell_ids, 1]
+        x_max, y_max = mask_.shape
+        num_cells = len(cell_ids)
+        in_mask_ = np.zeros(num_cells).astype('bool')
+        for n in range(num_cells):
+            if (x[n]<x_max) and (y[n]<y_max):
+                in_mask_[n] = mask_[x[n], y[n]]
+        cells_in_mask.append(cell_ids[in_mask_])
+    cells_in_mask = np.concatenate(cells_in_mask)
+    A_center = A_center[cells_in_mask]
+    dFF = dFF[cells_in_mask]
     
     num_z=A_center[:,0].max().astype('int')
     nc = 15
@@ -70,7 +74,7 @@ def brain_layer_seg_factor(row, t_min=5000, t_max=30000, l_thres_=0.5, n_thres =
 
 
 
-def brain_seg_factor(row, t_min=5000, t_max=30000, num_cluster=200, l_thres_=0.5, n_thres = 0.8):
+def brain_seg_factor(row, num_cluster=200, l_thres_=0.5, n_thres = 0.8):
     save_root = row['save_dir']+'/'
     print('Processing data at: '+row['dat_dir'])
     print('Saving at: '+save_root)
@@ -78,12 +82,30 @@ def brain_seg_factor(row, t_min=5000, t_max=30000, num_cluster=200, l_thres_=0.5
     _ = np.load(save_root+'cell_dff.npz', allow_pickle=True)
     A = _['A']
     A_loc = _['A_loc']
-    if t_min>(_['dFF'].shape[1]):
-        t_min = 0
-    dFF = _['dFF'].astype('float')[:, t_min:t_max]
-    dFF_ = _['dFF'].astype('float')
+    dFF = _['dFF'].astype('float')
     _ = None
+    brain_map = np.load(save_root+'Y_ave.npy').astype('float').squeeze()
     A_center = np.load(save_root+'cell_center.npy')
+    A_center_grid = np.round(A_center).astype('int')
+    # mask out the cells
+    cells_in_mask = []
+    for n_layer in range(brain_map.shape[0]):
+        layer_ = A_center[:, 0]==n_layer
+        cell_ids = np.where(layer_)[0]
+        mask_ = brain_map[n_layer]>2
+        y = A_center_grid[cell_ids, 2]
+        x = A_center_grid[cell_ids, 1]
+        x_max, y_max = mask_.shape
+        num_cells = len(cell_ids)
+        in_mask_ = np.zeros(num_cells).astype('bool')
+        for n in range(num_cells):
+            if (x[n]<x_max) and (y[n]<y_max):
+                in_mask_[n] = mask_[x[n], y[n]]
+        cells_in_mask.append(cell_ids[in_mask_])
+    cells_in_mask = np.concatenate(cells_in_mask)
+    A_center = A_center[cells_in_mask]
+    dFF = dFF[cells_in_mask]
+    
     num_z = A_center[:,0].max().astype('int')
     
     print('========Downsample neurons according to layer factor results========')
@@ -109,7 +131,7 @@ def brain_seg_factor(row, t_min=5000, t_max=30000, num_cluster=200, l_thres_=0.5
     valid_c=(np.abs(loadings_)>0).sum(axis=0)>100
     
     np.savez(save_root+'brain_seg_factors', \
-             dFF=dFF_[corr_idx][valid_cell], \
+             dFF=dFF[corr_idx][valid_cell], \
              lam=lam, loadings=loadings, \
              rotation_mtx=rotation_mtx, phi=phi, \
              scores=scores, scores_rot=scores_rot, \
