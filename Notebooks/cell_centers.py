@@ -49,6 +49,8 @@ if __name__ == "__main__":
     df = pd.read_csv('../Processing/data_list_in_analysis.csv')
     for ind, row in df.iterrows():
         save_root = row['save_dir']+'/'
+        if not os.path.exists(save_root+'cell_dff.npz'):
+            continue
         if not os.path.exists(save_root+'cell_center.npy'):
             cell_location(row)
         if not os.path.exists(save_root+'cell_center_.npy'):
