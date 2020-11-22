@@ -29,14 +29,14 @@ def comp_pulse_stats(dff_, trials, conds, pre, post):
     valid_ = np.zeros(num_).astype('bool')
     for n, trial in enumerate(trials):
         if len(dff_[trial-pre:trial+post])==(pre+post):
-            dff_cond[n] = dff_[trial-pre:trial+post]
+            dff_cond[n] = dff_[trial-pre:trial+post] - dff_[trial-pre:trial].mean()
             valid_[n] = True
     dff_cond = dff_cond[valid_]
     conds = conds[valid_]
     
     p_vec = np.zeros((1, pre+post))
     for n in range(pre+post):
-        _, p_vec[0, n] = kruskal_(dff_cond, conds)
+        _, p_vec[0, n] = kruskal_(dff_cond[:, n], conds)
         
     return np.array([p_vec, mean_(dff_cond, conds, axis=0)])[None,:],
 

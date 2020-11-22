@@ -1,18 +1,10 @@
-from brain_state_single_cell_class_raw import *
+from brain_state_sccr import *
 from utils import *
-from brain_seg import brain_seg_factor
-from factor import thres_factor_
 from swim_ephys import *
-from kernel_fit import *
-from scipy.stats import spearmanr
 import dask.array as da
-import zarr
-from fish_proc.utils.memory import clear_variables
 from fish_proc.utils import dask_ as fdask
-from sensory_motor_single_cell_class import open_ephys_metadata
 
-
-def brain_state_bar_code_raw(row):
+def brain_state_rl_bar_code_raw(row):
     save_root = row['save_dir']+'/'
     # check ephys data
     dat_dir = row['dat_dir'].replace('/im/', '/')
@@ -92,6 +84,7 @@ def brain_state_bar_code_raw(row):
         off_ = epoch_on[n_+1]
         swim_ = np.clip(swim_frame[on_:off_]-swim_thres, 0, np.inf)
         epoch_ = epoch_frame[on_:off_]
+        visu_ = visu_frame_[on_:off_]
         pulse_ = pulse_frame[on_:off_]
         ## remove the trial without epoch #3
         if (epoch_%5==3).sum()<120:
@@ -112,9 +105,13 @@ def brain_state_bar_code_raw(row):
                 if (evoke_epoch_end-swim_len_[-1])>12:
                     continue
         
+        # passive trial -- removing early stopping
         if trial_type_==1:
             swim_len_ = np.where(swim_[epoch_%5<=2]>0)[0]
+            vis_len_ = np.where(visu_[epoch_%5<=2]>0)[0]
             if (evoke_epoch_end-swim_len_[-1])<12: #change it from 14 to 12
+                continue
+            if np.abs(vis_len_[-1]-swim_len_[-1])<4:
                 continue
         pre_swim = swim_len_[-1]
         if (swim_[pre_swim+1:]>0).sum():

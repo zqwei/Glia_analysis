@@ -160,6 +160,17 @@ def estimate_threshold(signal, window=180000, scaling=1.6, lower_percentile=0.01
     return th
 
 
+def estimate_bot_threshold(signal, window=180000, lower_percentile=0.01):
+    from numpy import zeros, percentile, arange, median
+    th = zeros(signal.shape)
+    for t in arange(0, signal.size - window, window):
+        plr = arange(t, min(t + window, signal.size))
+        sig = signal[plr]
+        med = median(sig)
+        th[t:] = percentile(sig, lower_percentile)
+    return th
+
+
 def ep2frame(camtrig, thres=3.8):
     arr_ = (camtrig>thres).astype('int')
     return np.where((arr_[:-1]-arr_[1:])==-1)[0]+1
