@@ -4,8 +4,8 @@ from factor import factor_, thres_factor_
 
 def cell_location(row):
     save_root = row['save_dir']+'/'
-    print('Processing data at: '+row['dat_dir'])
-    print('Saving at: '+save_root)
+    # print('Processing data at: '+row['dat_dir'])
+    # print('Saving at: '+save_root)
     brain_map = np.load(save_root+'Y_ave.npy').astype('float').squeeze()    
     _ = np.load(save_root+'cell_dff.npz', allow_pickle=True)
     A = _['A']
@@ -26,8 +26,8 @@ def cell_location(row):
 # just leaving the data for reference
 def cell_location_(row):
     save_root = row['save_dir']+'/'
-    print('Processing data at: '+row['dat_dir'])
-    print('Saving at: '+save_root)
+    # print('Processing data at: '+row['dat_dir'])
+    # print('Saving at: '+save_root)
     brain_map = np.load(save_root+'Y_ave.npy').astype('float').squeeze()    
     _ = np.load(save_root+'cell_dff.npz', allow_pickle=True)
     A = _['A']

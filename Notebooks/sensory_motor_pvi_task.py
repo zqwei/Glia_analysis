@@ -5,7 +5,7 @@ import dask.array as da
 from fish_proc.utils import dask_ as fdask
 
 
-def sensory_motor_bar_code(row):
+def sensory_motor_pvi_bar_code(row):
     save_root = row['save_dir']+'/'
     # check ephys data
     dat_dir = row['dat_dir'].replace('/im/', '/')
@@ -40,38 +40,39 @@ def sensory_motor_bar_code(row):
     l_power = windowed_variance(fileContent_[0])[0]
     r_power = windowed_variance(fileContent_[1])[0]
     camtrig = fileContent_[2]
-
     expt_meta = glob(dat_dir+'ephys/*end*.xml')[0]
     expt_paradigm = open_ephys_metadata(expt_meta)
     probe_amp = (expt_paradigm.loc['LG probe']['velocity']*100).astype('int')
     probe_gain = expt_paradigm.loc['LG probe']['gain']
-
     indx = ep2frame(camtrig, thres=3.8)
     frame_ = np.zeros(len(camtrig))
     frame_[indx]=1
-    frame_ = frame_.cumsum()
-
-    slide_win = 180000
-    r_power_baseline = rolling_perc(r_power, window=slide_win, perc=0.1)
-    l_power_baseline = rolling_perc(l_power, window=slide_win, perc=0.1)
-
-    l_power_ = np.clip(l_power-l_power_baseline, 0, None)*10000
-    r_power_ = np.clip(r_power-r_power_baseline, 0, None)*10000
-
-    frame_len = np.min(np.unique(indx[1:]-indx[:-1]))
+    frame_ = frame_.cumsum()    
+    # frame_len = np.min(np.unique(indx[1:]-indx[:-1]))
+    frame_len = np.round(np.median(indx[1:]-indx[:-1])).astype('int')
 
     epoch_frame = np.median(wrap_data(fileContent_[5], indx, frame_len), axis=0).astype('int')[:num_dff]
-    swim_frame = np.mean(wrap_data(l_power_, indx, frame_len), axis=0)[:num_dff]
     pulse_frame = np.rint(np.median(wrap_data(fileContent_[8], indx, frame_len), axis=0)*100).astype('int')[:num_dff]
     visu_frame = np.mean(wrap_data(fileContent_[3], indx, frame_len), axis=0)[:num_dff]
     visu_frame_ = visu_frame.copy()
     visu_frame_[visu_frame_<0]=0
-    
-    ###################################
-    ## Swim power threshold for swim detection
-    ###################################
-    swim_thres = max(np.percentile(swim_frame, 85), 0.2)
-    pulse_amp = probe_amp #np.unique(pulse_frame)[1]
+    l_power_th = estimate_bot_threshold(l_power, window=180000, lower_percentile=0.01)
+    r_power_th = estimate_bot_threshold(r_power, window=180000, lower_percentile=0.01)
+    l_power_norm = np.clip(l_power-l_power_th, 0, np.inf)
+    r_power_norm = np.clip(r_power-r_power_th, 0, np.inf)
+    _power = l_power_norm + r_power_norm
+    starts, stops, thr = estimate_swims(_power, fs=6000, scaling=2.0)
+    starts_ = np.where(starts==1)[0]
+    stops_ = np.where(stops==1)[0]
+    starts_frame = ind2frame(starts_, indx)
+    stops_frame = ind2frame(stops_, indx)+1
+    swim_t_frame = np.vstack([starts_frame,stops_frame])
+    # get frame with swim
+    swim_frame_binary = np.zeros(len(epoch_frame)).astype('bool')
+    for n_start, n_stop in zip(starts_frame, stops_frame):
+        swim_frame_binary[n_start:n_stop]=True
+
+    pulse_amp = probe_amp
     
     ###################################
     ## Sensory cells for multiple pulses
@@ -95,13 +96,13 @@ def sensory_motor_bar_code(row):
     t_post = 50
     t_pre = 5
     for n, trial in enumerate(mlt_pulse_on):
-        swim_ = np.clip(swim_frame[trial-t_pre:trial+t_post]-swim_thres, 0, np.inf)
+        swim_ = swim_frame_binary[trial-t_pre:trial+t_post]
         if swim_.sum()==0: # remove the trial mixed pulse and motor
             mlt_pulse_trial.append(trial)
             mlt_pulse_type.append(epoch_frame[trial]//5)
 
     for n, trial in enumerate(mlt_nopulse_on):
-        swim_ = np.clip(swim_frame[trial-t_pre:trial+t_post]-swim_thres, 0, np.inf)
+        swim_ = swim_frame_binary[trial-t_pre:trial+t_post]
         if swim_.sum()==0: # remove the trial mixed pulse and motor
             mlt_nopulse_trial.append(trial)
             mlt_nopulse_type.append(epoch_frame[trial]//5)

@@ -156,7 +156,6 @@ def estimate_threshold(signal, window=180000, scaling=1.6, lower_percentile=0.01
         med = median(sig)
         bottom = percentile(sig, lower_percentile)
         th[t:] = med + scaling * (med - bottom)
-
     return th
 
 
@@ -169,6 +168,13 @@ def estimate_bot_threshold(signal, window=180000, lower_percentile=0.01):
         med = median(sig)
         th[t:] = percentile(sig, lower_percentile)
     return th
+
+
+def ind2frame(x, ind):
+    x_ = x.copy()
+    for n, _ in enumerate(x):
+        x_[n] = (_>ind).sum()
+    return x_
 
 
 def ep2frame(camtrig, thres=3.8):

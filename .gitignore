@@ -13,6 +13,7 @@ info
 *.mp4
 results/
 analyses_in_progress/
+*.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
