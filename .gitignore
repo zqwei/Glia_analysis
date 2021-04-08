@@ -11,6 +11,7 @@ info
 *.png
 *.tif*
 *.mp4
+figures/
 results/
 analyses_in_progress/
 *.ipynb
