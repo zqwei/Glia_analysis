@@ -18,19 +18,20 @@ def sensory_motor_bar_code(row):
         print(ephys_dir)
         return None
     
-    _ = np.load(save_root+'cell_dff.npz', allow_pickle=True)
-    A = _['A']
-    A_loc = _['A_loc']
-    num_dff = _['dFF'].shape[-1]
+    # _ = np.load(save_root+'cell_dff.npz', allow_pickle=True)
+    # A = _['A']
+    # A_loc = _['A_loc']
+    # num_dff = _['dFF'].shape[-1]
     # dFF = _['dFF'].astype('float')
-    _ = None
+    # _ = None
     
     
-    numCore = 450
-    cluster, client = fdask.setup_workers(numCore=numCore,is_local=False)
+    numCore = 50
+    cluster, client = fdask.setup_workers(numCore=numCore,is_local=True)
     fdask.print_client_links(client)
     print(client.dashboard_link)
     dFF_ = da.from_zarr(save_root+'cell_dff.zarr')
+    num_dff = dFF_.shape[-1]
 
     ###################################
     ## Downsample sensory and motor input to frames

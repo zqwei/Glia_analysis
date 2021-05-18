@@ -19,7 +19,7 @@ def multi_vel_bar_code(row):
     num_dff = _['dFF'].shape[-1]
     _ = None
     
-    numCore = 450
+    numCore = 50
     cluster, client = fdask.setup_workers(numCore=numCore,is_local=False)
     fdask.print_client_links(client)
     print(client.dashboard_link)

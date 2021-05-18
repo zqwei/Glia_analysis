@@ -6,17 +6,19 @@ from pathlib import Path
 from sensory_motor_pvi_task import *
 from brain_state_pvi_bcr import *
 
-df = pd.read_csv('../Processing/data_list_in_analysis.csv')
+df = pd.read_csv('../Processing/data_list_in_analysis_osc_curated.csv')
 
-# for ind, row in df.iterrows():
-#     save_root = row['save_dir']+'/'
+for ind, row in df.iterrows():
+    save_root = row['save_dir']+'/'
 #     if 'replay' in row['taskType']:
 #         continue
-#     if 'simulate-visual' in row['taskType']:
-#         continue
-#     print(row['save_dir'])
-#     sensory_motor_bar_code(row)
-#     brain_state_bar_code_raw(row)
+    if (ind<9) or (ind>11):
+        continue
+    if 'simulate-visual' in row['taskType']:
+        continue
+    print(ind, row['save_dir'])
+    sensory_motor_bar_code(row)
+    brain_state_bar_code_raw(row)
 
 
 # for ind, row in df.iterrows():
@@ -27,17 +29,17 @@ df = pd.read_csv('../Processing/data_list_in_analysis.csv')
 #     multi_vel_bar_code(row)
 
 
-for ind, row in df.iterrows():
-    save_root = row['save_dir']+'/'
-    if not 'MG_vs_replayGU' in row['taskType']:
-        continue
-    print(row['save_dir'])
+# for ind, row in df.iterrows():
+#     save_root = row['save_dir']+'/'
+#     if not 'MG_vs_replayGU' in row['taskType']:
+#         continue
+#     print(row['save_dir'])
 #     if not os.path.exists(row['save_dir']+'cell_type_stats_msensory.npz'):
 #         sensory_motor_bar_code(row)
 #     if not os.path.exists(row['save_dir']+'cell_pulse_ap_stats_raw.npz'):
 #         brain_state_rl_bar_code_raw(row)
 #     sensory_motor_bar_code(row)
-    brain_state_rl_bar_code_raw(row)
+#     brain_state_rl_bar_code_raw(row)
 
 
 # for ind, row in df.iterrows():

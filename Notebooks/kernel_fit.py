@@ -15,7 +15,7 @@ from scipy.optimize import Bounds
 def pulse_resp(pulse_input, g_t, w_pulse):
     t_vec = np.where(pulse_input==1)[0]
     w_mat = np.zeros(len(pulse_input)+len(w_pulse))
-    for n in range(len(t_vec)):
+    for n in range(len(g_t)):
         w_mat[t_vec[n]:t_vec[n]+len(w_pulse)] += w_pulse*g_t[n]
     return w_mat[:len(pulse_input)]
 

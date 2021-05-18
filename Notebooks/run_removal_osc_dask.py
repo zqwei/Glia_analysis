@@ -60,8 +60,8 @@ if __name__ == "__main__":
         if not os.path.exists(save_dir+'cell_dff.npz'):
             continue
         copyfiles(row)
-        if os.path.exists(osc_removal_dir+'cell_dff.npz'):
-            continue
+#         if os.path.exists(osc_removal_dir+'cell_dff.npz'):
+#             continue
         print(osc_removal_dir)
         removal_chunk_osc(row)
         
