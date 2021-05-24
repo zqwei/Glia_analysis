@@ -3,16 +3,23 @@ import os, sys
 from glob import glob
 from swim_ephys import *
 from utils import *
-df = pd.read_csv('../Processing/data_list_in_analysis_osc_curated.csv')
+# df = pd.read_csv('../Processing/data_list_in_analysis_osc_curated.csv')
+df = pd.read_csv('../Processing/data_list_in_analysis_downsample.csv')
+
 
 for ind, row in df.iterrows():
     # check ephys data
+    if not isinstance(row['dat_dir'], str):
+        continue
+    if not isinstance(row['save_dir'], str):
+        continue
     dat_dir = row['dat_dir'].replace('/im/', '/')
     dat_dir = dat_dir.replace('/im_CM0/', '/')
     dat_dir = dat_dir.replace('/im_CM1/', '/')
     p_dir = dat_dir + 'processed/'
     ephys_dir = dat_dir + '/ephys/'
     save_root = row['save_dir']+'/'
+    
     
     if os.path.exists(save_root+'ephys.npz'):
         continue
@@ -36,6 +43,7 @@ for ind, row in df.iterrows():
     l_power = windowed_variance(fileContent_[0])[0]
     r_power = windowed_variance(fileContent_[1])[0]
     camtrig = fileContent_[2]
+    
     try:
         expt_meta = glob(dat_dir+'ephys/*end*.xml')[0]
     except:
