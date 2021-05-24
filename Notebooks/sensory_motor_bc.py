@@ -6,26 +6,8 @@ from fish_proc.utils import dask_ as fdask
 
 
 def sensory_motor_bar_code(row):
-    save_root = row['save_dir']+'/'
-    # check ephys data
-    dat_dir = row['dat_dir'].replace('/im/', '/')
-    dat_dir = dat_dir.replace('/im_CM0/', '/')
-    dat_dir = dat_dir.replace('/im_CM1/', '/')
-    p_dir = dat_dir + 'processed/'
-    ephys_dir = dat_dir + 'ephys/'
-    if not os.path.exists(ephys_dir):
-        print('Missing directory')
-        print(ephys_dir)
-        return None
-    
-    # _ = np.load(save_root+'cell_dff.npz', allow_pickle=True)
-    # A = _['A']
-    # A_loc = _['A_loc']
-    # num_dff = _['dFF'].shape[-1]
-    # dFF = _['dFF'].astype('float')
-    # _ = None
-    
-    
+    # check the existence of files in run file
+    save_root = row['save_dir']+'/' 
     numCore = 50
     cluster, client = fdask.setup_workers(numCore=numCore,is_local=True)
     fdask.print_client_links(client)
@@ -33,46 +15,20 @@ def sensory_motor_bar_code(row):
     dFF_ = da.from_zarr(save_root+'cell_dff.zarr')
     num_dff = dFF_.shape[-1]
 
-    ###################################
-    ## Downsample sensory and motor input to frames
-    ###################################
-    ephys_dat = glob(ephys_dir+'/*.10chFlt')[0]
-    fileContent_ = load(ephys_dat)
-    l_power = windowed_variance(fileContent_[0])[0]
-    r_power = windowed_variance(fileContent_[1])[0]
-    camtrig = fileContent_[2]
-
-    expt_meta = glob(dat_dir+'ephys/*end*.xml')[0]
-    expt_paradigm = open_ephys_metadata(expt_meta)
-    probe_amp = (expt_paradigm.loc['LG probe']['velocity']*100).astype('int')
-    probe_gain = expt_paradigm.loc['LG probe']['gain']
-
-    indx = ep2frame(camtrig, thres=3.8)
-    frame_ = np.zeros(len(camtrig))
-    frame_[indx]=1
-    frame_ = frame_.cumsum()
-
-    slide_win = 180000
-    r_power_baseline = rolling_perc(r_power, window=slide_win, perc=0.1)
-    l_power_baseline = rolling_perc(l_power, window=slide_win, perc=0.1)
-
-    l_power_ = np.clip(l_power-l_power_baseline, 0, None)*10000
-    r_power_ = np.clip(r_power-r_power_baseline, 0, None)*10000
-
-    frame_len = np.min(np.unique(indx[1:]-indx[:-1]))
-
-    epoch_frame = np.median(wrap_data(fileContent_[5], indx, frame_len), axis=0).astype('int')[:num_dff]
-    swim_frame = np.mean(wrap_data(l_power_, indx, frame_len), axis=0)[:num_dff]
-    pulse_frame = np.rint(np.median(wrap_data(fileContent_[8], indx, frame_len), axis=0)*100).astype('int')[:num_dff]
-    visu_frame = np.mean(wrap_data(fileContent_[3], indx, frame_len), axis=0)[:num_dff]
-    visu_frame_ = visu_frame.copy()
-    visu_frame_[visu_frame_<0]=0
+    _ = np.load(save_root+'ephys.npz', allow_pickle=True)
+    probe_amp   = _['probe_amp']
+    probe_gain  = _['probe_gain']
+    swim_t_frame= _['swim_t_frame']
+    epoch_frame = _['epoch_frame']
+    lswim_frame = _['lswim_frame']
+    rswim_frame = _['rswim_frame']
+    pulse_frame = _['pulse_frame']
+    visu_frame  = _['visu_frame']
+    visu_frame_ = _['visu_frame_']
+    swim_frame  = lswim_frame + rswim_frame
     
-    ###################################
-    ## Swim power threshold for swim detection
-    ###################################
     swim_thres = max(np.percentile(swim_frame, 85), 0.2)
-    pulse_amp = probe_amp #np.unique(pulse_frame)[1]
+    pulse_amp = probe_amp
     
     ###################################
     ## Sensory cells for multiple pulses
@@ -93,7 +49,7 @@ def sensory_motor_bar_code(row):
         else:
             mlt_nopulse_on.append(n_pen+1)
 
-    t_post = 50
+    t_post = 30
     t_pre = 5
     for n, trial in enumerate(mlt_pulse_on):
         swim_ = np.clip(swim_frame[trial-t_pre:trial+t_post]-swim_thres, 0, np.inf)
@@ -110,77 +66,14 @@ def sensory_motor_bar_code(row):
     cell_msensory_stats = dFF_.map_blocks(multi_pulse_stats_chunks, pulse_trial=mlt_pulse_trial, nopulse_trial=mlt_nopulse_trial, t_pre=t_pre, t_post=t_post, dtype='O').compute() 
     np.savez(save_root+'cell_type_stats_msensory', cell_msensory_stats=cell_msensory_stats)
     
-    
-    ###################################
-    ## Sensory cells for single pulse
-    ###################################   
-    pulse_trial = []
-    pulse_type = []
-    pulse_motor_trial = []
-    pulse_motor_type = []
-    nopulse_trial = []
-    nopulse_type = []
-
-    pulse_on = np.where((pulse_frame[:-1]==0) & (pulse_frame[1:]==pulse_amp))[0]+1
-    pulse_on = pulse_on[pulse_on<num_dff-10]
-
-    for n, trial in enumerate(pulse_on):
-        swim_ = np.clip(swim_frame[trial-2:trial+5]-swim_thres, 0, np.inf)
-        if swim_.sum()==0: # remove the trial mixed pulse and motor
-            pulse_trial.append(trial)
-            pulse_type.append(epoch_frame[trial]//5)
-        else:
-            pulse_motor_trial.append(trial)
-            pulse_motor_type.append(epoch_frame[trial]//5)
-
-    trial_len_ = 7
-    for n, trial in enumerate(mlt_nopulse_on):
-        for m in range(8):
-            swim_ = np.clip(swim_frame[trial+m*trial_len_-2:trial+m*trial_len_+5]-swim_thres, 0, np.inf)
-            if swim_.sum()==0:
-                nopulse_trial.append(trial+m*trial_len_-2)
-                nopulse_type.append(epoch_frame[trial+m*trial_len_]//5)
-
-    if len(pulse_trial)>0:
-        cell_sensory_stats = dFF_.map_blocks(pulse_stats_chunks, pulse_trial=pulse_trial, nopulse_trial=nopulse_trial, dtype='O').compute() 
-        np.savez(save_root+'cell_type_stats_sensory', cell_sensory_stats=cell_sensory_stats)
-
-    if (len(pulse_motor_trial)>0) and (probe_gain==0):
-        cell_pulse_motor_stats = dFF_.map_blocks(pulse_stats_chunks, pulse_trial=pulse_motor_trial, nopulse_trial=nopulse_trial, dtype='O').compute()
-        np.savez(save_root+'cell_type_stats_pulse_motor', cell_pulse_motor_stats=cell_pulse_motor_stats)
-
-    if (len(pulse_trial)>0) and (len(pulse_motor_trial)>0) and (probe_gain==0):
-        cell_comp_pulse_motor_stats = dFF_.map_blocks(comp_stats_chunks, cond_trial=pulse_trial, comp_trial=pulse_motor_trial, pre=2, post=5, dtype='O').compute()  
-        np.savez(save_root+'cell_comp_pulse_motor_stats_', cell_comp_pulse_motor_stats=cell_comp_pulse_motor_stats)
-
     ###################################
     ## motor cells
     ###################################
-    swim_thres = max(np.percentile(swim_frame, 85), 0.2)
-    drop_frame = 100
-
     swim_trial = []
     swim_type = []
-
     noswim_trial = []
     noswim_type = []
-
-    swim_smooth = smooth(swim_frame, gaussKernel(sigma=1.5))
-    swim_smooth = swim_smooth>swim_thres
-    swim_on = np.where((swim_smooth[:-1]==0) & (swim_smooth[1:]==1))[0]+1
-    swim_off = np.where((swim_smooth[:-1]==1) & (swim_smooth[1:]==0))[0]
-    swim_on = swim_on[swim_on>drop_frame]
-    swim_on = swim_on[swim_on<num_dff-10]
-    swim_off = swim_off[swim_off>drop_frame]
-    swim_off = swim_off[swim_off<num_dff-10]
-    if swim_off[0]<swim_on[0]:
-        swim_off = swim_off[1:]
-    if swim_on[-1]>swim_off[-1]:
-        swim_on = swim_on[:-1]
-
-    if swim_on.shape!=swim_off.shape:
-        print('Error in swim matches')
-
+    swim_on,  swim_off = swim_t_frame
     swim_lens = (swim_on[1:] - swim_on[:-1])
     swim_lens = np.r_[swim_lens, np.inf]
     swim_on = swim_on[swim_lens>=10]
@@ -220,7 +113,7 @@ def sensory_motor_bar_code(row):
     if len(swim_trial_)>0:
         cell_motor_stats = dFF_.map_blocks(motor_stats_chunks, swim_trial=swim_trial_, noswim_trial=noswim_trial, swim_len=swim_len, pre_len=pre_len, dtype='O').compute() 
         np.savez(save_root+'cell_type_stats_motor', cell_motor_stats=cell_motor_stats)
-        
-    fdask.terminate_workers(cluster, client)
+    
+    fdask.terminate_workers(cluster, client)    
     return None
 
