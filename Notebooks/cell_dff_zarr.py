@@ -2,14 +2,12 @@ from utils import *
 import shutil
 import dask.array as da
 import zarr
-brain_map_thres = 2
+
 
 def cell_dff_zarr(row):
     save_root = row['save_dir']+'/'    
     # print(save_root)
     _ = np.load(save_root+'cell_dff.npz', allow_pickle=True)
-    A = _['A']
-    A_loc = _['A_loc']
     dFF = _['dFF'].astype('float')
     _ = None
     numCore = 450
@@ -21,7 +19,8 @@ def cell_dff_zarr(row):
 
 
 if __name__ == "__main__":
-    df = pd.read_csv('../Processing/data_list_in_analysis_osc_curated.csv')
+#     df = pd.read_csv('../Processing/data_list_in_analysis_osc_curated.csv')
+    df = pd.read_csv('../Processing/data_list_in_analysis_downsample.csv')
     for ind, row in df.iterrows():
         save_root = row['save_dir']+'/'
         if not os.path.exists(save_root+'cell_dff.npz'):
