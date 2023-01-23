@@ -1,10 +1,13 @@
 import numpy as np
+import re
 from h5py import File
 import matplotlib.pyplot as plt
 import fish_proc.wholeBrainDask.cellProcessing_single_WS as fwc
 import dask.array as da
 import os
 import pandas as pd
+sub_str = 'im_CM._dff'
+temp_str = re.compile(sub_str)
 
 def cell_loc(cell_id):
     thres_ = 0.005
@@ -13,14 +16,28 @@ def cell_loc(cell_id):
     x_loc, y_loc, z_loc = X[cell_id],Y[cell_id],Z[cell_id]
     return (z_loc.dot(w_))/w_.sum(), (x_loc.dot(w_))/w_.sum(), (y_loc.dot(w_))/w_.sum()
 
-df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v3.csv')
+# df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v3.csv')
+df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v1.csv')
+
 
 for ind, row in df.iterrows():
-    if ind<78:
-        continue
+    # if ind<73:
+    #     continue
     print(ind)
-    dir_ = row['im_volseg']+'/'
-    save_root = row['save_dir']+'/'
+    # check if downsample data
+    dir_ = row['im_volseg']+'/'    
+    if temp_str.search(dir_) is not None:
+        print(dir_)
+        print('downsample data skip')
+        continue
+    # check if there is a saving location
+    save_root = row['save_dir']
+    if '/' not in save_root:
+        print(save_root)
+        print('invalid save location')
+        continue
+        
+    save_root = save_root +'/'
     if not os.path.exists(save_root):
         os.makedirs(save_root)
     print(save_root)
