@@ -18,7 +18,8 @@ warnings.filterwarnings('ignore')
 # df = pd.read_csv('../Datalists/data_list_in_analysis_osc_curated.csv', index_col=None)
 # df = pd.read_csv('../Datalists/data_list_in_analysis_downsample.csv', index_col=None)
 # df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v0.csv', index_col=None)
-df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v0.csv', index_col=None)
+# df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v0.csv', index_col=None)
+df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv', index_col=None)
 
 
 def kickAssSwimDetect01(ch1,ch2,thre):

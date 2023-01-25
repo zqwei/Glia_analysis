@@ -1,6 +1,6 @@
 from utils import *
 import pandas as pd
-df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v3.csv')
+df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv')
 
 atlas_path = r'/groups/ahrens/ahrenslab/jing/zebrafish_atlas/yumu_confocal/20150519/im/cy14_1p_stitched.h5'
 atlas = np.swapaxes(read_h5(atlas_path, dset_name='channel0'),1,2).astype('float64')[::-1]

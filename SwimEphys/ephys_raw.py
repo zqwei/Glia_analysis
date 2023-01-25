@@ -1,7 +1,8 @@
 from utils import *
 from swim_ephys import *
 
-df = pd.read_csv('../Datalists/Behavioral_ephys.csv', index_col=None)
+# df = pd.read_csv('../Datalists/Behavioral_ephys.csv', index_col=None)
+df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv', index_col=None)
 
 def kickAssSwimDetect01(ch1,ch2,thre):
     import numpy as np
@@ -145,9 +146,10 @@ def kickAssSwimDetect01(ch1,ch2,thre):
 
 
 for n, row in df.iterrows():
-    if n<60:
-        continue
-    ephys_root = row['Ephys']
+    # if n<60:
+    #     continue
+    # ephys_root = row['Ephys']
+    ephys_root = row['dat_dir']
     print(ephys_root)
     save_root = row['save_dir']
     ind_ = ephys_root.find('ephys')
@@ -158,6 +160,8 @@ for n, row in df.iterrows():
     ephys_dir = dat_dir+'/ephys/'
     if not os.path.exists(save_root):
         os.makedirs(save_root)
+    if os.path.exists(save_root+'KA_raw_swim.npz'):
+        continue
     
     ###################################
     ## Downsample sensory and motor input to frames
