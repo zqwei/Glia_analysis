@@ -5,8 +5,10 @@ def read_reg_mat(file):
         l = [[float(num) for num in line.replace(' \n', '').split(' ')] for line in f]
     return np.array(l)
 
-# df = pd.read_csv('../Processing/data_list_in_analysis_osc_curated.csv')
 df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv')
+# df = pd.read_csv('../Datalists/data_list_in_analysis_glia_v3.csv')
+# df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v1.csv')
+# df = pd.read_csv('../Datalists/data_list_in_analysis_DA_v0.csv')
 
 atlas_path = r'/groups/ahrens/ahrenslab/jing/zebrafish_atlas/yumu_confocal/20150519/im/cy14_1p_stitched.h5'
 atlas = np.swapaxes(read_h5(atlas_path, dset_name='channel0'),1,2).astype('float64')[::-1]
@@ -21,10 +23,6 @@ atlas = None
 
 for ind, row in df.iterrows():
     if row['high_res']=='None':
-        continue
-    if ind<29:
-        continue
-    if ind>31:
         continue
     print(ind)
     moving_root = row['dat_dir']
