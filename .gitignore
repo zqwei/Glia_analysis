@@ -3,7 +3,6 @@ depreciated*/
 dask*
 *.npy
 info
-*data*/
 *.h5
 *.zarr/
 *.txt
