@@ -10,11 +10,13 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 import warnings
+import os
 warnings.filterwarnings('ignore')
 
 # dfile = '../../Datalists/data_list_in_analysis_pulse_cells_v2.csv'
 # dfile = '../../Datalists/data_list_in_analysis_NGGU.csv'
-dfile = '../Datalists/data_list_in_analysis_glia_v1.csv'
+# dfile = '../Datalists/data_list_in_analysis_glia_v1.csv'
+dfile = '../Datalists/data_list_in_analysis_slimmed_v4.csv'
 df = pd.read_csv(dfile, index_col=0)
 
 
@@ -22,6 +24,10 @@ rr_list = []
 rl_list = []
 for ind, row in df.iterrows():
     save_root = row['save_dir']+'/'
+    
+    if not os.path.exists(save_root + 'KA_ephys.npz'):
+        print(ind)
+        continue
 
     _ = np.load(save_root + 'KA_ephys.npz', allow_pickle=True)
     epoch_frame=_['epoch_frame']

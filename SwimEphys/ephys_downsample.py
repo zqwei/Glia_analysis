@@ -15,10 +15,6 @@ from swim_ephys import *
 import warnings
 warnings.filterwarnings('ignore')
 
-# df = pd.read_csv('../Datalists/data_list_in_analysis_osc_curated.csv', index_col=None)
-# df = pd.read_csv('../Datalists/data_list_in_analysis_downsample.csv', index_col=None)
-# df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v0.csv', index_col=None)
-# df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v0.csv', index_col=None)
 df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv', index_col=None)
 
 
@@ -166,8 +162,9 @@ def kickAssSwimDetect01(ch1,ch2,thre):
 for n, row in df.iterrows():   
     save_root = row['save_dir']
     if os.path.exists(save_root+'KA_ephys.npz'):
-        print(save_root)
-        print('Done')
+        print(n)
+        # print(save_root)
+        # print('Done')
         continue
     # ephys_root = row['dat_dir']
     # ind_ = ephys_root.find('im')
