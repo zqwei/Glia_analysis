@@ -15,8 +15,9 @@ warnings.filterwarnings('ignore')
 
 # dfile = '../../Datalists/data_list_in_analysis_pulse_cells_v2.csv'
 # dfile = '../../Datalists/data_list_in_analysis_NGGU.csv'
-# dfile = '../Datalists/data_list_in_analysis_glia_v1.csv'
-dfile = '../Datalists/data_list_in_analysis_slimmed_v4.csv'
+# dfile = '../Datalists/data_list_in_analysis_slimmed_v4.csv'
+# dfile = '../Datalists/data_list_in_analysis_glia_v3.csv'
+dfile = '../Datalists/data_list_in_analysis_NE_v2.csv'
 df = pd.read_csv(dfile, index_col=0)
 
 
@@ -27,6 +28,8 @@ for ind, row in df.iterrows():
     
     if not os.path.exists(save_root + 'KA_ephys.npz'):
         print(ind)
+        rr_list.append(np.nan)
+        rl_list.append(np.nan)
         continue
 
     _ = np.load(save_root + 'KA_ephys.npz', allow_pickle=True)

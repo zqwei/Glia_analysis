@@ -1,7 +1,9 @@
 from utils import *
 from swim_ephys import *
 
-df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv', index_col=None)
+# df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv', index_col=None)
+df = pd.read_csv('../Datalists/data_list_in_analysis_glia_v3.csv', index_col=None)
+# df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v2.csv', index_col=None)
 
 def kickAssSwimDetect01(ch1,ch2,thre):
     import numpy as np
