@@ -16,13 +16,13 @@ def cell_loc(cell_id):
     x_loc, y_loc, z_loc = X[cell_id],Y[cell_id],Z[cell_id]
     return (z_loc.dot(w_))/w_.sum(), (x_loc.dot(w_))/w_.sum(), (y_loc.dot(w_))/w_.sum()
 
-# df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v3.csv')
-df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v1.csv')
+df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv')
+# df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v1.csv')
 
 
 for ind, row in df.iterrows():
-    # if ind<73:
-    #     continue
+    if ind<87:
+        continue
     print(ind)
     # check if downsample data
     dir_ = row['im_volseg']+'/'    

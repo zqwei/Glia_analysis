@@ -5,12 +5,14 @@ import warnings
 warnings.filterwarnings('ignore')
 import pandas as pd
 
-# df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv', index_col=0)
-df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v2.csv', index_col=0)
+df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv', index_col=0)
+# df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v2.csv', index_col=0)
 # df = pd.read_csv('../Datalists/data_list_in_analysis_glia_v3.csv', index_col=0)
 
 
 for ind, row in df.iterrows():
+    if ind<86:
+        continue
     save_root = row['save_dir']+'/'
     if os.path.exists(save_root+'cell_in_brain.npy'):
         continue
