@@ -10,6 +10,9 @@ info
 *.png
 *.tif*
 *.mp4
+*.pdf
+*.svg
+*.tiff
 figures/
 results/
 analyses_in_progress/
