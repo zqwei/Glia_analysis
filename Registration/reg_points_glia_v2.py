@@ -42,13 +42,14 @@ for ind, row in df.iterrows():
     # create empty image for size information
     x_, y_, z_ = atlas_range
     # item() to convert numpy.int to python int
-    saltas_ = sitk.Image((z_[1]-z_[0]).item(), (y_[1]-y_[0]).item(), \
-                         (x_[1]-x_[0]).item(), sitk.sitkUInt8)  
+    # sitk GetImageFromArray swap z & x
+    saltas_ = sitk.Image((x_[1]-x_[0]).item(), (y_[1]-y_[0]).item(), \
+                         (z_[1]-z_[0]).item(), sitk.sitkUInt8)  
     x_, y_, z_ = fix_range
-    sfix_ = sitk.Image((z_[1]-z_[0]).item(), (y_[1]-y_[0]).item(), \
-                       (x_[1]-x_[0]).item(), sitk.sitkUInt8)
-    sfimg_ = sitk.Image(fimg.shape[0], (y_[1]-y_[0]).item(), \
-                        (x_[1]-x_[0]).item(), sitk.sitkUInt8)
+    sfix_ = sitk.Image((x_[1]-x_[0]).item(), (y_[1]-y_[0]).item(), \
+                       (z_[1]-z_[0]).item(), sitk.sitkUInt8)
+    sfimg_ = sitk.Image(fimg.shape[2], fimg.shape[1], \
+                        fimg.shape[0], sitk.sitkUInt8)
 
     sfimg_.SetSpacing(fimg_vox[:-1])
     sfix_.SetSpacing(fix_vox[:-1])
@@ -67,8 +68,8 @@ for ind, row in df.iterrows():
         flip_xyz = np.array([0, 0, 0]).astype('bool')
     flip_x = flip_xyz[0].astype('int')
     x_, y_, z_ = fix_neuron_range
-    sfix_neuron = sitk.Image((z_[1]-z_[0]).item(), (y_[1]-y_[0]).item(), \
-                             (x_[1]-x_[0]).item(), sitk.sitkUInt8) 
+    sfix_neuron = sitk.Image((x_[1]-x_[0]).item(), (y_[1]-y_[0]).item(), \
+                             (z_[1]-z_[0]).item(), sitk.sitkUInt8)
     sfix_neuron.SetSpacing(fix_neuron_vox[:-1])
     sfix_neuron.SetDirection([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
     

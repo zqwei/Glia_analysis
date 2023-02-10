@@ -1,13 +1,15 @@
 from utils import *
 import pandas as pd
 
-df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv')
+# df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv')
 # df = pd.read_csv('../Datalists/data_list_in_analysis_glia_v3.csv')
-# df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v1.csv')
+df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v2.csv')
 # df = pd.read_csv('../Datalists/data_list_in_analysis_DA_v0.csv')
 
 
 for ind, row in df.iterrows():
+    if ind not in [4, 6, 8]:
+        continue
     if row['high_res']=='None':
         continue
     fimg_dir = row['save_dir']
@@ -15,9 +17,11 @@ for ind, row in df.iterrows():
     if not os.path.exists(fimg_dir+'cell_center_voluseg.npy'):
         # redo files with x, y swap
         continue
-    if os.path.exists(fimg_dir+'cell_center_registered_.npy'):
-        continue
+    # if os.path.exists(fimg_dir+'cell_center_registered_.npy'):
+    #     continue
     if not os.path.exists(save_root):
+        continue
+    if not os.path.exists(fimg_dir + 'registration/atlas_fix_wrap_mat.nii.gz'):
         continue
     print(ind)
     
@@ -36,13 +40,14 @@ for ind, row in df.iterrows():
     # create empty image for size information
     x_, y_, z_ = atlas_range
     # item() to convert numpy.int to python int
-    saltas_ = sitk.Image((z_[1]-z_[0]).item(), (y_[1]-y_[0]).item(), \
-                         (x_[1]-x_[0]).item(), sitk.sitkUInt8)  
+    # sitk GetImageFromArray swap z & x
+    saltas_ = sitk.Image((x_[1]-x_[0]).item(), (y_[1]-y_[0]).item(), \
+                         (z_[1]-z_[0]).item(), sitk.sitkUInt8)  
     x_, y_, z_ = fix_range
-    sfix_ = sitk.Image((z_[1]-z_[0]).item(), (y_[1]-y_[0]).item(), \
-                         (x_[1]-x_[0]).item(), sitk.sitkUInt8)
-    sfimg_ = sitk.Image(fimg.shape[0], (y_[1]-y_[0]).item(), \
-                         (x_[1]-x_[0]).item(), sitk.sitkUInt8)
+    sfix_ = sitk.Image((x_[1]-x_[0]).item(), (y_[1]-y_[0]).item(), \
+                       (z_[1]-z_[0]).item(), sitk.sitkUInt8)
+    sfimg_ = sitk.Image(fimg.shape[2], fimg.shape[1], \
+                        fimg.shape[0], sitk.sitkUInt8)
 
     sfimg_.SetSpacing(fimg_vox[:-1])
     sfix_.SetSpacing(fix_vox[:-1])
@@ -113,6 +118,7 @@ for ind, row in df.iterrows():
     if flip_x == 1:
         # flip x when it is marked
         x_, y_, z_ = sfimg_.GetSize()
+        print(x_, y_, z_)
         x = x_ - x
     point_list_low = np.vstack([x.flatten(), y.flatten(), z.flatten()]).T.astype('float')
     paltas_low = [tx_inv_high_atlas(tx_inv_low_high(_)) for _ in point_list_low]

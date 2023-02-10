@@ -1,21 +1,21 @@
 from utils import *
 import pandas as pd
-# df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v3.csv')
-df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v1.csv')
+df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv')
+# df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v1.csv')
 
 
 for ind, row in df.iterrows():
-    if ind==2:
-        continue
-    if ind>8:
+    if ind<86:
         continue
     if row['high_res']=='None':
         continue
     moving_root = row['dat_dir']
     fimg_dir = row['save_dir']
-    fish_name = fimg_dir.split('/')[-2]
-    if 'voluseg' in fimg_dir:
-        fish_name = fimg_dir.split('/')[-3]
+    fish_name = fimg_dir.split('/')[-3]+'_im_CM1'
+    if 'im_CM0_voluseg' in fimg_dir:
+        fish_name = fimg_dir.split('/')[-3]+'_im_CM0_voluseg'
+    if 'im_CM1_voluseg' in fimg_dir:
+        fish_name = fimg_dir.split('/')[-3]+'_im_CM1_voluseg'
     if 'im_CM0_dff' in fimg_dir:
         fish_name = fimg_dir.split('/')[-3]+'_im_CM0_dff'
     if 'im_CM1_dff' in fimg_dir:
