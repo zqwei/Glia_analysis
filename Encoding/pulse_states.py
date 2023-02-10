@@ -2,7 +2,7 @@ import numpy as np
 import os, sys
 import pandas as pd
 from pulse_coding import utest_block
-df = pd.read_csv('../Processing/data_list_in_analysis_pulse_cells_v2.csv')
+df = pd.read_csv('../Datalists/data_list_in_analysis_neuron_v0.csv')
 
 def process_file(ind):
     from scipy.stats import spearmanr
@@ -31,8 +31,8 @@ def process_file(ind):
     dFF_ = dFF_[cell_in_brain]
 
     CL_idx = epoch_frame<=1
-    rl, _ = spearmanr(lswim_frame[CL_idx], visu_frame[CL_idx])
-    rr, _ = spearmanr(rswim_frame[CL_idx], visu_frame[CL_idx])
+    rl = row['rl']
+    rr = row['rr']
     if rl >= rr:
         swim_frame_ = lswim_frame
     else:

@@ -2,10 +2,7 @@ import numpy as np
 import os, sys
 import dask.array as da
 import pandas as pd
-# df = pd.read_csv('../Processing/data_list_in_analysis_slimmed_.csv')
-# df = pd.read_csv('../Processing/data_list_in_analysis_osc_curated.csv')
-# df = pd.read_csv('../Processing/data_list_in_analysis_slimmed_v00.csv')
-df = pd.read_csv('../Datalists/data_list_in_analysis_pulse_cells_v2.csv')
+df = pd.read_csv('../Datalists/data_list_in_analysis_neuron_v0.csv')
 
 
 def spearmanr_block(a, b, axis=0):
@@ -75,8 +72,8 @@ def process_n_file_data(ind, trial_post = 35, trial_pre = 5,
     dFF_ = dFF_[cell_in_brain]
     
     CL_idx = epoch_frame<=1
-    rl, _ = spearmanr(lswim_frame[CL_idx], visu_frame[CL_idx])
-    rr, _ = spearmanr(rswim_frame[CL_idx], visu_frame[CL_idx])
+    rl = row['rl']
+    rr = row['rr']
     if rl >= rr:
         swim_frame_ = lswim_frame
     else:
@@ -91,7 +88,10 @@ def process_n_file_data(ind, trial_post = 35, trial_pre = 5,
         on_ = epoch_on[n_]-trial_pre
         off_ = epoch_on[n_]+trial_post
         vis_ = visu_frame[on_:off_]
-        if (vis_<0).mean()>0.1: # catch trial
+        probe_ = pulse_frame[on_:off_]
+        # if (vis_<0).mean()>0.1: # catch trial
+        #     continue
+        if (probe_==0).mean()<0.9: # non catch trial skip
             continue
         swm_ = np.cumsum(swim_frame_[on_-pre_ext:off_])
         if (swm_>0).sum()>swim_thres:
@@ -109,9 +109,11 @@ def process_n_file_data(ind, trial_post = 35, trial_pre = 5,
         on_ = epoch_on[n_]-trial_pre
         off_ = epoch_on[n_]+trial_post+10
         vis_ = visu_frame[on_:off_]
-        if (vis_<0).mean()<=0.1: # catch trial
-            continue
         probe_ = pulse_frame[on_:off_]
+        # if (vis_<0).mean()<=0.1: # non catch trial
+        #     continue
+        if (probe_==0).mean()>0.9: # catch trial skip
+            continue
         # probe_on_ = np.where(probe_==probe_amp)[0][0]+epoch_on[n_]-trial_pre # aligned to probe on
         probe_on_ = np.where(probe_>0)[0][0]+epoch_on[n_]-trial_pre # aligned to probe on
         on_ = probe_on_-trial_pre
@@ -138,7 +140,10 @@ def process_n_file_data(ind, trial_post = 35, trial_pre = 5,
         on_ = epoch_on[n_]-trial_pre
         off_ = epoch_on[n_]+trial_post
         vis_ = visu_frame[on_:off_]
-        if (vis_<0).mean()>0.1: # catch trial
+        probe_ = pulse_frame[on_:off_]
+        # if (vis_<0).mean()>0.1: # catch trial
+        #     continue
+        if (probe_==0).mean()<0.9: # non catch trial skip
             continue
         swm_ = np.cumsum(swim_frame_[on_-pre_ext:off_])
         if (swm_>0).sum()>swim_thres:
@@ -156,9 +161,11 @@ def process_n_file_data(ind, trial_post = 35, trial_pre = 5,
         on_ = epoch_on[n_]-trial_pre
         off_ = epoch_on[n_]+trial_post+10
         vis_ = visu_frame[on_:off_]
-        if (vis_<0).mean()<=0.1: # catch trial
-            continue
         probe_ = pulse_frame[on_:off_]
+        # if (vis_<0).mean()<=0.1: # non catch trial
+        #     continue
+        if (probe_==0).mean()>0.9: # catch trial skip
+            continue
         # probe_on_ = np.where(probe_==probe_amp)[0][0]+epoch_on[n_]-trial_pre # aligned to probe on
         probe_on_ = np.where(probe_>0)[0][0]+epoch_on[n_]-trial_pre # aligned to probe on
         on_ = probe_on_-trial_pre

@@ -15,7 +15,7 @@ from tqdm import tqdm
 # df = pd.read_csv('../Datalists/data_list_in_analysis_pulse_cells_v2.csv')
 # df = pd.read_csv('../Datalists/data_list_in_analysis_NGGU.csv')
 # df = pd.read_csv('../Datalists/data_list_in_analysis_glia_v1.csv')
-df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v0.csv')
+df = pd.read_csv('../Datalists/data_list_in_analysis_neuron_v0.csv')
 
 
 def process_n_file(ind):
@@ -104,4 +104,6 @@ def process_n_file(ind):
 
 
 for ind, _ in df.iterrows():
+    if ind != 9:
+        continue
     process_n_file(ind)

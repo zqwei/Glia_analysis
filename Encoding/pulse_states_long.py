@@ -2,7 +2,7 @@ import numpy as np
 import os, sys
 import pandas as pd
 from pulse_coding import utest_block
-df = pd.read_csv('../Datalists/data_list_in_analysis_pulse_cells_v2.csv')
+df = pd.read_csv('../Datalists/data_list_in_analysis_neuron_v0.csv')
 
 def process_file(ind):
     from scipy.stats import spearmanr    
@@ -130,10 +130,10 @@ def process_file(ind):
     
     print(CL_trial.sum(), (~CL_trial).sum())
     
-#     # without removing baseline
-#     p_ = utest_block(dFF_trial[:, :, CL_trial], dFF_trial[:, :, ~CL_trial], swim_mask_trial[:, CL_trial], swim_mask_trial[:, ~CL_trial])
+    # without removing baseline
+    p_ = utest_block(dFF_trial[:, :, CL_trial], dFF_trial[:, :, ~CL_trial], swim_mask_trial[:, CL_trial], swim_mask_trial[:, ~CL_trial])
     
-#     np.savez(save_root+'cell_state_pulse_long_with_catch', p_=p_, cell_idx=cell_idx)
+    np.savez(save_root+'cell_state_pulse_long_with_catch', p_=p_, cell_idx=cell_idx)
     return None
 
 
