@@ -27,6 +27,7 @@ for ind, row in df.iterrows():
     cell_idx2 = sig_time>6
     cell_idx = cell_idx1 | cell_idx2
     
+    # state-dependent cells
     res = np.load(save_root+'cell_state_pulse.npy')
     sig_time = (res<0.05).sum(axis=1)
     cell_idx_ = sig_time>5

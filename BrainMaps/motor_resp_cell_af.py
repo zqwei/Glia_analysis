@@ -19,11 +19,21 @@ for ind, row in df.iterrows():
     _ = np.load(save_root+'cell_motor_corr.npz')
     p_cell=_['p_cell']
     r_cell=_['r_cell']
-    cell_idx = (p_cell<0.05) & (r_cell<-0.05) # negative cells
-    # cell_idx = (p_cell<0.05) & (r_cell>0.3) # positive cells
+    # cell_idx = (p_cell<0.05) & (r_cell<-0.05) # negative cells
+    cell_idx = (p_cell<0.05) & (r_cell>0.3) # positive cells
+    
+    # state-dependent cells
+    res = np.load(save_root+'cell_state_pulse.npy')
+    sig_time = (res<0.05).sum(axis=1)
+    cell_idx_ = sig_time>5
+    res = np.load(save_root+'cell_states_no_CT.npz')['pulse_condition_res_no_CT']
+    sig_time = (res<0.05).sum(axis=1)
+    cell_idx_ = cell_idx_ | (sig_time>5)
+    cell_idx = cell_idx & cell_idx_
+    
     num_cells = cell_idx.sum()
     cell_loc.append(cells_center[cell_idx])
-    
+        
     if 'Replay' in save_root:
         task_ = np.zeros(num_cells).astype('bool')
     else:
@@ -53,4 +63,6 @@ for n_animal in range(animal.max()+1):
     
 mask_folder = '/nrs/ahrens/Ziqiang/Jing_Glia_project/cell_masks/'
 # np.savez_compressed(mask_folder+'positive_motor_cells.npz', result_tmp=result_.astype('uint8'))
-np.savez_compressed(mask_folder+'negative_motor_cells.npz', result_tmp=result_.astype('uint8'))
+# np.savez_compressed(mask_folder+'negative_motor_cells.npz', result_tmp=result_.astype('uint8'))
+np.savez_compressed(mask_folder+'positive_motor_state_cells.npz', result_tmp=result_.astype('uint8'))
+# np.savez_compressed(mask_folder+'negative_motor_state_cells.npz', result_tmp=result_.astype('uint8'))
