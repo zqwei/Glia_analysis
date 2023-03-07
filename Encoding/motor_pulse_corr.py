@@ -104,6 +104,6 @@ def process_n_file(ind):
 
 
 for ind, _ in df.iterrows():
-    if ind != 9:
+    if ind > 5:
         continue
     process_n_file(ind)
