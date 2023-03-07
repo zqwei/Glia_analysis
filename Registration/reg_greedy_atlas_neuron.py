@@ -1,11 +1,11 @@
 from utils import *
 import pandas as pd
-df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv')
-# df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v1.csv')
+# df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv')
+df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v2.csv')
 
 
 for ind, row in df.iterrows():
-    if ind<86:
+    if ind!=4:
         continue
     if row['high_res']=='None':
         continue
@@ -22,9 +22,9 @@ for ind, row in df.iterrows():
         fish_name = fimg_dir.split('/')[-3]+'_im_CM1_dff'
 
     save_root = fimg_dir+'/registration/'
-    if os.path.exists(save_root + 'atlas_fix_wrap_inv_mat.nii.gz'):
-        print('registration done')
-        continue
+    # if os.path.exists(save_root + 'atlas_fix_wrap_inv_mat.nii.gz'):
+    #     print('registration done')
+    #     continue
 
     pre_fix_root = '/nrs/ahrens/Ziqiang/scratch/registration/'+fish_name + '/'
     print(save_root, pre_fix_root)
