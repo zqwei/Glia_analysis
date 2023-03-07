@@ -2,6 +2,7 @@
 depreciated*/
 dask*
 *.npy
+*.npz
 info
 *.h5
 *.zarr/
