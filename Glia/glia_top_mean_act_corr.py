@@ -33,7 +33,7 @@ for ind, row in df.iterrows():
         continue
     save_root = row['save_dir']+'/'
     cell_in_brain = np.load(save_root+'cell_in_brain.npy')
-    _ = np.load(save_root+'mean_act_corr.npz', allow_pickle=True)
+    _ = np.load(save_root+'mean_top_act_corr.npz', allow_pickle=True)
     corr_ = _['corr_']
     valid_dFF_ = _['valid_dFF_']
     corr_thres_ = np.percentile(corr_, 60)
