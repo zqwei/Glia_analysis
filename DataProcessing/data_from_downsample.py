@@ -10,7 +10,7 @@ from glob import glob
 sub_str = 'im_CM._dff'
 temp_str = re.compile(sub_str)
 # df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv')
-df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v2.csv')
+df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v3.csv')
 
 def imread(v, baseline=100):
     # img = File(v,'r')['func'][()]
@@ -21,7 +21,7 @@ def imread(v, baseline=100):
     return img
 
 for n, row in df.iterrows():
-    if n != 4:
+    if n <12:
         continue
     im_dir = row['im_volseg']
     if temp_str.search(im_dir) is None:
