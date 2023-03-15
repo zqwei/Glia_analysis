@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, '../utils/')
 from mp_funcs import *
 import pandas as pd
 df = pd.read_csv('../Datalists/data_list_in_analysis_glia_v3.csv')
