@@ -15,7 +15,7 @@ from tqdm import tqdm
 # df = pd.read_csv('../Datalists/data_list_in_analysis_pulse_cells_v2.csv')
 # df = pd.read_csv('../Datalists/data_list_in_analysis_NGGU.csv')
 # df = pd.read_csv('../Datalists/data_list_in_analysis_glia_v1.csv')
-df = pd.read_csv('../Datalists/data_list_in_analysis_neuron_v1.csv')
+df = pd.read_csv('../Datalists/data_list_in_analysis_neuron_v6.csv')
 
 
 def process_n_file(ind):

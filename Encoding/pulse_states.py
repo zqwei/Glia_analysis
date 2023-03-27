@@ -2,7 +2,7 @@ import numpy as np
 import os, sys
 import pandas as pd
 from pulse_coding import utest_block
-df = pd.read_csv('../Datalists/data_list_in_analysis_neuron_v0.csv')
+df = pd.read_csv('../Datalists/data_list_in_analysis_neuron_v6.csv')
 
 def process_file(ind):
     from scipy.stats import spearmanr
