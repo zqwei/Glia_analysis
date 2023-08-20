@@ -3,7 +3,8 @@ import numpy.ma as ma
 import os, sys
 import dask.array as da
 import pandas as pd
-df = pd.read_csv('../Datalists/data_list_in_analysis_neuron_v6.csv')
+# df = pd.read_csv('../Datalists/data_list_in_analysis_neuron_v6.csv')
+df = pd.read_csv('../Datalists/data_list_in_analysis_pulse_cells_v2.csv')
 
 
 def moving_average(a, n) :
