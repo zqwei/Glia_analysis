@@ -4,8 +4,8 @@ import os
 import pandas as pd
 # df = pd.read_csv('../Datalists/data_list_in_analysis_glia_v3.csv', index_col=0)
 # df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v2.csv', index_col=0)
-df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv', index_col=0)
-
+# df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv', index_col=0)
+df = pd.read_csv('../Datalists/data_list_in_analysis_calex_neuron_v1.csv')
 
 for ind, row in df.iterrows():
     save_root = row['save_dir']+'/'
