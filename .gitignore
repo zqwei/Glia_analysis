@@ -1,4 +1,5 @@
 # Project ignore files
+.DS_Store
 depreciated*/
 tmp/
 dask*
