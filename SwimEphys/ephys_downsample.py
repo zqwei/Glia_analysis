@@ -18,7 +18,8 @@ warnings.filterwarnings('ignore')
 # df = pd.read_csv('../Datalists/data_list_in_analysis_slimmed_v4.csv', index_col=None)
 # df = pd.read_csv('../Datalists/data_list_in_analysis_glia_v3.csv', index_col=None)
 # df = pd.read_csv('../Datalists/data_list_in_analysis_NE_v3.csv', index_col=None)
-df = pd.read_csv('../Datalists/data_list_in_analysis_ACh_v0.csv', index_col=None)
+# df = pd.read_csv('../Datalists/data_list_in_analysis_ACh_v0.csv', index_col=None)
+df = pd.read_csv('../Datalists/data_list_in_analysis_calex_neuron_v1.csv', index_col=None)
 
 
 def kickAssSwimDetect01(ch1,ch2,thre):
@@ -176,7 +177,7 @@ for n, row in df.iterrows():
     # else:
     #     dat_dir = ephys_root
     # ephys_dir = dat_dir+'/ephys/'
-    ephys_dir = row['dat_dir']+'/'
+    ephys_dir = row['dat_dir']+'/ephys/'
 
     ###################################
     ## Downsample sensory and motor input to frames
