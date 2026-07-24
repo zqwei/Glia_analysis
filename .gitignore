@@ -1,6 +1,7 @@
 # Project ignore files
 .DS_Store
 depreciated*/
+.depreciated*/
 tmp/
 dask*
 *.npy
