@@ -12,7 +12,7 @@ DEST="/nrs/ahrens/Ziqiang/Jing_Glia_project/compiled_data_codes"
 echo "== code: $SRC -> $DEST/code/ =="
 rsync -av \
   --exclude='__pycache__' --exclude='.ipynb_checkpoints' --exclude='.DS_Store' \
-  --exclude='processed_data' --exclude='sync_to_compiled.sh' \
+  --exclude='processed_data' --exclude='sync_to_compiled.sh' --exclude='additional' \
   "$SRC"/ "$DEST/code/"
 
 if [ -d "$SRC/processed_data" ]; then
