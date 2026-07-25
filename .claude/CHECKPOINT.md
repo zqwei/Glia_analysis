@@ -48,6 +48,11 @@ these, just leave them as empty stubs in the `/nrs` staging copy.
 8. Only `.py` files under `Notebooks/src/` are git-trackable — `*.ipynb`,
    `*.csv` (outside `Datalists/`), `*.npy`/`*.npz`, `*.pdf` are all gitignored
    repo-wide. Commit + push just the `.py` scripts.
+9. `Notebooks/additional/` holds unsorted/internal-record-only analyses that
+   should NOT be part of the capsule — `sync_to_compiled.sh` explicitly
+   excludes this folder by name. Anything meant for the actual CodeOcean
+   submission goes directly under `Notebooks/` (or `Notebooks/src/`), never
+   in `additional/`.
 
 ## Structure at /nrs/ahrens/Ziqiang/Jing_Glia_project/compiled_data_codes/
 
