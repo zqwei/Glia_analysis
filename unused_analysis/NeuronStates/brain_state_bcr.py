@@ -1,4 +1,4 @@
-from brain_state_sccr import *
+from unused_analysis.NeuronStates.brain_state_sccr import *
 from utils import *
 from swim_ephys import *
 import dask.array as da

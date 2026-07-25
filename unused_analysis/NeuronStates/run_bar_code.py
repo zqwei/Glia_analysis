@@ -1,8 +1,8 @@
 #!/groups/ahrens/home/weiz/miniconda3/envs/myenv/bin/python
 
-from sensory_motor_bc import *
-from brain_state_bcr import *
-from brain_state_rl_bcr import *
+from unused_analysis.NeuronStates.sensory_motor_bc import *
+from unused_analysis.NeuronStates.brain_state_bcr import *
+from unused_analysis.NeuronStates.brain_state_rl_bcr import *
 from multi_vel_bc import *
 from pathlib import Path
 from sensory_motor_pvi_task import *

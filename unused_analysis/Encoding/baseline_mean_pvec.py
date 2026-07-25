@@ -1,4 +1,4 @@
-from baseline_coding import *
+from unused_analysis.Encoding.baseline_coding import *
 
 
 if __name__ == "__main__":

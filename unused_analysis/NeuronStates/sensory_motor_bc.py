@@ -1,4 +1,4 @@
-from sensory_motor_scc import *
+from unused_analysis.NeuronStates.sensory_motor_scc import *
 from utils import *
 from swim_ephys import *
 import dask.array as da
