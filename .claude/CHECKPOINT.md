@@ -166,12 +166,47 @@ those 4 notebooks: `af_pulse_neg_cells.tif`, `color_bar_hot.tiff`,
 `pos_int_cells_af_xz.tiff`, `pos_pulse_cells_af_xy.tiff`,
 `pos_pulse_cells_af_xz.tiff`.
 
-**Deliberately NOT deleted**: `pulse_cell_pos_xy.tiff`, `pulse_cell_pos_xz.tiff`,
-`pulse_cell_neg_xy.tiff`, `pulse_cell_neg_xz.tiff` remain in
-`Clusters/depreciated/Figure_3_brain_maps/` — `brain_clusters_af_pulse.ipynb`
-(not moved) has live, uncommented `savefig` calls writing those same
-filenames (cells 63, 70). Also untouched: `act_int_pos.tif`/`act_int_neg.tif`,
-which belong solely to `brain_clusters_af_pulse.ipynb`.
+**Update (later same day)**: `pulse_cell_pos_xy.tiff`, `pulse_cell_pos_xz.tiff`,
+`pulse_cell_neg_xy.tiff`, `pulse_cell_neg_xz.tiff` were initially left in
+place because `brain_clusters_af_pulse.ipynb` (not moved) had live,
+uncommented `savefig` calls writing those same filenames (cells 63, 70) —
+since v0/v1 had moved away, that conflict resolved itself. The user then
+asked to strip all figure output from `brain_clusters_af_pulse.ipynb`
+itself: all 17 live `plt.savefig(...)` calls (cells 31-70) were replaced with
+`plt.show()` (source-only edit, NOT re-executed — too expensive to re-run
+casually), and all 16 files that notebook had generated were deleted (those 4
+tiffs, plus `act_int_pos.tif`/`act_int_neg.tif`, 8 `act_pulse_*.svg`,
+`int_pos/neg_dynamics.pdf`). Left untouched: `int_diff*.pdf`, `pulse_diff.pdf`
+— those belong to other, unrelated notebooks in that folder.
+
+## Data relocations out of the repo (repo path -> /nrs)
+
+When a data folder gets moved to `/nrs`, check for and fix stale path
+references in any still-active code.
+
+- `Encoding/`, `BrainMaps/`, `Neuromodulator/`, `NeuronStates/` ->
+  `unused_analysis/<FolderName>/` (2026-07-24, commit `858725f`). `Encoding/`
+  moved back to top-level shortly after (Fig 1h/1i depend on it); the other
+  three remain under `unused_analysis/`.
+- `Clusters/depreciated/_dat_brain_clusters_dynamcis/{cluster_dynamics,epochs}`
+  -> `/nrs/ahrens/Ziqiang/Jing_Glia_project/processed_af_data/{cluster_dynamics,epochs}`
+  (2026-07-26). Old repo folder now empty. Fixed 3 stale references, each
+  verified to run:
+  - `Clusters/Figure_3H_af_epoch_dynamics.py` (active) — committed, `a9c3c14`.
+  - `Clusters/Figure_4DE_af_brain_cluster_at_swim_on.py` (active) —
+    committed, `a9c3c14`. Also fixed an unrelated pre-existing bug: missing
+    `import pandas as pd` (shared `Clusters/utils.py` never provides `pd`).
+    `Figure_4A_ex_brain_cluster_long_trial.py` has the same latent bug, not
+    fixed (out of scope).
+  - `Clusters/af_brain_cluster_dynamics_pulse_on.ipynb` (active) —
+    source-only edit, gitignored, not committed, not re-executed.
+  - Deliberately NOT updated: notebooks already under deprecated/scratch
+    locations (`Clusters/depreciated/ex_brain_clusters_dynamcis/*.ipynb`,
+    `Clusters/depreciated/Figure_5_state_modulation_period/*.ipynb`,
+    `.depreciated/neural_state_decoder/*.ipynb`,
+    `Clusters/tmp/replay_trial_ex_cluster_dynamics.ipynb`) still reference
+    the old empty path — left as-is since they're not part of the active
+    pipeline.
 
 ## Notes on repo structure
 
