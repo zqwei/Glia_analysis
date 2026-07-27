@@ -4,7 +4,7 @@ SloMO_Memory brain cluster, compared across CL vs OL trials.
 '''
 
 from utils import *
-dat_folder = 'depreciated/_dat_brain_clusters_dynamcis/epochs/'
+dat_folder = '/nrs/ahrens/Ziqiang/Jing_Glia_project/processed_af_data/epochs/'
 
 label_ = 'SloMO_Memory'
 dat_evoke_list = []

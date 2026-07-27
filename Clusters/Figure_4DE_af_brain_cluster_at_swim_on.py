@@ -3,9 +3,10 @@ Neural dynamics aligned to last pulse before swim onset
 '''
 
 from utils import *
+import pandas as pd
 
 df = pd.read_csv('../Datalists/data_list_in_analysis_neuron_v8.csv')
-dat_save_folder = 'depreciated/_dat_brain_clusters_dynamcis/cluster_dynamics/'
+dat_save_folder = '/nrs/ahrens/Ziqiang/Jing_Glia_project/processed_af_data/cluster_dynamics/'
 loc = 'IPN'
 
 dFF_epochs = []
