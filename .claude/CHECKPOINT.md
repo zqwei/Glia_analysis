@@ -53,6 +53,12 @@ these, just leave them as empty stubs in the `/nrs` staging copy.
    excludes this folder by name. Anything meant for the actual CodeOcean
    submission goes directly under `Notebooks/` (or `Notebooks/src/`), never
    in `additional/`.
+10. `Notebooks/old_figure_panels/` (added 2026-07-28) is excluded the same
+    way — obsolete figure-panel `.py` scripts kept in git as a historical
+    record, not synced to the capsule. Unlike `additional/`, these files ARE
+    git-tracked. When adding any new "don't sync" folder under `Notebooks/`,
+    add it to `sync_to_compiled.sh`'s exclude list and verify with an actual
+    sync run.
 
 ## Structure at /nrs/ahrens/Ziqiang/Jing_Glia_project/compiled_data_codes/
 
