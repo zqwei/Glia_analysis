@@ -13,6 +13,7 @@ echo "== code: $SRC -> $DEST/code/ =="
 rsync -av \
   --exclude='__pycache__' --exclude='.ipynb_checkpoints' --exclude='.DS_Store' \
   --exclude='processed_data' --exclude='sync_to_compiled.sh' --exclude='additional' \
+  --exclude='old_figure_panels' \
   "$SRC"/ "$DEST/code/"
 
 if [ -d "$SRC/processed_data" ]; then
