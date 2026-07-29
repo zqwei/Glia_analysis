@@ -4,8 +4,8 @@ Tracking the effort to compile `Notebooks/` figure notebooks + backing data into
 `/nrs/ahrens/Ziqiang/Jing_Glia_project/compiled_data_codes/`, for upload as a
 CodeOcean compute capsule alongside the Nature paper submission.
 
-Last updated: 2026-07-28. This is a snapshot — check the actual repo/NRS state
-before trusting specifics.
+Last updated: 2026-07-28 (Fig 3b added). This is a snapshot — check the actual
+repo/NRS state before trusting specifics.
 
 ## Why CodeOcean, and the capsule layout
 
@@ -69,6 +69,7 @@ code/                                       -- mirrors Notebooks/, paths rewritt
   Figure_2bcdf_4f_brain_map.ipynb
   Figure_2bcdf_activity_plot.ipynb
   Figure_4cd_neural_prediction_swim.ipynb
+  Figure_3b_example_cluster_dynamics.ipynb
   src/
     Fig_1h_generate_processed_data.py
     Fig_2bcdf_4f_generate_processed_data.py   -- reduces raw brain-map volumes to xy/xz projections
@@ -76,6 +77,7 @@ code/                                       -- mirrors Notebooks/, paths rewritt
     Fig_2bcdf_4f_generate_motor_maps.py       -- NOT executed; documents af_motor_pos/neg_cells.npy derivation
     Fig_2bcdf_activity_generate_processed_data.py
     Fig_4cd_generate_processed_data.py
+    Fig_3b_generate_processed_data.py
     plotting_utils.py                        -- shared plot_shade_err helper (not figure-specific)
 data/
   processed_data/                            -- small, notebook-ready inputs
@@ -165,13 +167,41 @@ environment/, metadata/                     -- empty; CodeOcean populates these 
   - `ex_premotor_dynamics_v1.ipynb` (in `Notebooks/additional/`) has the same
     matplotlib-version vibrancy issue but has NOT been switched to
     `google_em` yet — only this notebook has been fixed so far.
+- **`Figure_3b_example_cluster_dynamics.ipynb`** — for each of three example
+  brain regions (**Cb, OT, IO**), left = long-trial CL(black)/OL(red)
+  population-average dynamics trace (probe-aligned, extends through the full
+  recovery period), right = pulse-response statistics across the same
+  trials (mean±sem per pre-probe window, CL black / OL red).
+  - **IO is used in place of PT** — PT's per-region dFF cache was never
+    computed for this dataset (checked
+    `/nrs/ahrens/Ziqiang/Jing_Glia_project/processed_af_data/cluster_dynamics/`:
+    has `Cb, IO, IPN, LMO, NEMO, OT, PO, SLoMO, vTel` for fish 0/1/2/4, no
+    `PT` for any fish). The user confirmed IO and PT are
+    anatomically/functionally exchangeable for this panel.
+  - Sources: `Notebooks/old_figure_panels/Figure_4A_ex_brain_cluster_long_trial.py`
+    (long-trial windowing — originally a single hardcoded fish + a
+    manually-picked per-fish DBSCAN cluster label, not reproducible per
+    region) and `Figure_4DE_af_brain_cluster_at_swim_on.py` (pulse-response
+    statistics — already parameterized by a `loc` region string and the
+    cached `fish_{n}_{loc}.npy` arrays). `Fig_3b_generate_processed_data.py`
+    generalizes both to loop over fish 0/1/2 × region (Cb/OT/IO), reusing the
+    same cached per-region dFF arrays for both panels — this makes region
+    selection fully code-reproducible (no manual per-fish cluster lookup),
+    unlike the original long-trial panel. The two trial-selection loops are
+    kept as faithful, separate copies of their respective source scripts
+    (the accept/reject filters genuinely differ between them — not a
+    refactor-safe merge).
+  - Old pre-existing (non-reproducible) legacy figures for reference:
+    `Notebooks/additional/Clusters/depreciated/Figure_4A Long_trial/population_dynamics_{Cb,IPN,OT,PT}_long.svg`
+    and `Notebooks/additional/Clusters/figures/pulse_probe_int_{Cb,OT}.pdf`
+    (no PT version of the latter ever existed, for the reason above).
 
 ## Panel TODO list (work through one at a time)
 
 - [x] Fig 2bcdf: brain maps — `Figure_2bcdf_4f_brain_map.ipynb` (also covers 4f)
 - [x] Fig 2bcdf: activity plot — `Figure_2bcdf_activity_plot.ipynb`
 - [ ] Fig 2bcdf: statistics
-- [ ] Fig 3b: example cluster activity plot and statistics
+- [x] Fig 3b: example cluster activity plot and statistics — `Figure_3b_example_cluster_dynamics.ipynb` (Cb/OT/IO, IO standing in for PT)
 - [ ] Fig 3cde: modulation depth
 - [ ] Fig 3fgh: modulation duration
 - [ ] Fig 4ab: example cluster activity plot and late-phase statistics
@@ -255,10 +285,11 @@ which tracks what's been *built*). As of 2026-07-28:
 ## Sync status
 
 Last confirmed synced to `/nrs/ahrens/Ziqiang/Jing_Glia_project/compiled_data_codes/`
-on 2026-07-28: all 5 notebooks + 7 `src/*.py` scripts under `code/`, all 5
-processed-data files under `data/processed_data/`. Repo git status was clean
-at that point. Re-run `Notebooks/sync_to_compiled.sh` after any new change
-before considering it done.
+on 2026-07-28: 5 notebooks + 7 `src/*.py` scripts under `code/`, 5
+processed-data files under `data/processed_data/`. **`Figure_3b_example_cluster_dynamics.ipynb`
++ `Fig_3b_generate_processed_data.py` + `Fig_3b_example_cluster_dynamics.npz`
+built after that sync — not yet synced.** Re-run `Notebooks/sync_to_compiled.sh`
+after any new change before considering it done.
 
 ## Notes on repo structure
 
