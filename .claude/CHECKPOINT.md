@@ -4,7 +4,7 @@ Tracking the effort to compile `Notebooks/` figure notebooks + backing data into
 `/nrs/ahrens/Ziqiang/Jing_Glia_project/compiled_data_codes/`, for upload as a
 CodeOcean compute capsule alongside the Nature paper submission.
 
-Last updated: 2026-07-25. This is a snapshot — check the actual repo/NRS state
+Last updated: 2026-07-28. This is a snapshot — check the actual repo/NRS state
 before trusting specifics.
 
 ## Why CodeOcean, and the capsule layout
@@ -67,13 +67,16 @@ code/                                       -- mirrors Notebooks/, paths rewritt
   Figure_1h_average_diff_dynamics_epochs.ipynb
   Figure_1i_fraction_diff_cells.ipynb
   Figure_2bcdf_4f_brain_map.ipynb
+  Figure_2bcdf_activity_plot.ipynb
   Figure_4cd_neural_prediction_swim.ipynb
   src/
     Fig_1h_generate_processed_data.py
     Fig_2bcdf_4f_generate_processed_data.py   -- reduces raw brain-map volumes to xy/xz projections
     Fig_2bcdf_4f_generate_pulse_maps.py       -- NOT executed; documents af_pulse_pos/neg_cells.npy derivation
     Fig_2bcdf_4f_generate_motor_maps.py       -- NOT executed; documents af_motor_pos/neg_cells.npy derivation
+    Fig_2bcdf_activity_generate_processed_data.py
     Fig_4cd_generate_processed_data.py
+    plotting_utils.py                        -- shared plot_shade_err helper (not figure-specific)
 data/
   processed_data/                            -- small, notebook-ready inputs
   raw_data/Fish1..Fish5/                     -- ~89GB total; cell_dff.npz, cell_in_brain.npy, KA_ephys.npz,
@@ -239,6 +242,23 @@ references in any still-active code.
     `Clusters/tmp/replay_trial_ex_cluster_dynamics.ipynb`) still reference
     the old empty path — left as-is since they're not part of the active
     pipeline.
+
+## Open questions the user is tracking (Notebooks/additional/Notes.md)
+
+The user keeps a running scratch note at `Notebooks/additional/Notes.md` for
+open questions not yet resolved (separate from the panel TODO list above,
+which tracks what's been *built*). As of 2026-07-28:
+- **Fig 2e**: cannot find the information about pre-motor cell index.
+- **Fig 2b-f4**: cannot completely find out the bar-plot parameters used in
+  the original paper.
+
+## Sync status
+
+Last confirmed synced to `/nrs/ahrens/Ziqiang/Jing_Glia_project/compiled_data_codes/`
+on 2026-07-28: all 5 notebooks + 7 `src/*.py` scripts under `code/`, all 5
+processed-data files under `data/processed_data/`. Repo git status was clean
+at that point. Re-run `Notebooks/sync_to_compiled.sh` after any new change
+before considering it done.
 
 ## Notes on repo structure
 
