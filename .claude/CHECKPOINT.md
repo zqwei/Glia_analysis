@@ -143,11 +143,10 @@ environment/, metadata/                     -- empty; CodeOcean populates these 
   (2b/2c/2d — loads two small precomputed caches, no raw per-fish data
   needed) and `Figure_2_ex_motor_dynamics_v1.ipynb` (2f — needs one example
   fish's raw trial data, row 2 in the datalist).
-  - Flagged, not resolved: the 2d (pulse-neg) trace's cell-selection
-    threshold, ported verbatim (`pulse_r < 0.05`), is far weaker than the
-    brain map's own `pulse_r < 0` cutoff — selects ~55% of all cells rather
-    than a clean negative subset. Still produces a visible CL-trial
-    suppression dip, not obviously broken, but worth a second look.
+  - Resolved (2026-07-28): the 2d (pulse-neg) trace now reuses the exact
+    same cell selection (`sort_idx`, top 5000 most-negative `pulse_r`) as
+    its heatmap, instead of the source notebook's own much weaker
+    `pulse_r < 0.05` threshold (~55% of all cells).
   - Heatmaps pin `cmap='rocket'` explicitly (`import seaborn as sns` is
     enough to register the name, no need for `sns.set()`), and the
     notebook's kernelspec was switched to the **`google_em`** conda env
