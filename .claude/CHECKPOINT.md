@@ -4,8 +4,8 @@ Tracking the effort to compile `Notebooks/` figure notebooks + backing data into
 `/nrs/ahrens/Ziqiang/Jing_Glia_project/compiled_data_codes/`, for upload as a
 CodeOcean compute capsule alongside the Nature paper submission.
 
-Last updated: 2026-07-28 (Fig 3b added). This is a snapshot — check the actual
-repo/NRS state before trusting specifics.
+Last updated: 2026-07-29 (Fig 3b left panel corrected). This is a snapshot —
+check the actual repo/NRS state before trusting specifics.
 
 ## Why CodeOcean, and the capsule layout
 
@@ -172,25 +172,28 @@ environment/, metadata/                     -- empty; CodeOcean populates these 
   population-average dynamics trace (probe-aligned, extends through the full
   recovery period), right = pulse-response statistics across the same
   trials (mean±sem per pre-probe window, CL black / OL red).
-  - **IO is used in place of PT** — PT's per-region dFF cache was never
-    computed for this dataset (checked
-    `/nrs/ahrens/Ziqiang/Jing_Glia_project/processed_af_data/cluster_dynamics/`:
-    has `Cb, IO, IPN, LMO, NEMO, OT, PO, SLoMO, vTel` for fish 0/1/2/4, no
-    `PT` for any fish). The user confirmed IO and PT are
-    anatomically/functionally exchangeable for this panel.
-  - Sources: `Notebooks/old_figure_panels/Figure_4A_ex_brain_cluster_long_trial.py`
-    (long-trial windowing — originally a single hardcoded fish + a
-    manually-picked per-fish DBSCAN cluster label, not reproducible per
-    region) and `Figure_4DE_af_brain_cluster_at_swim_on.py` (pulse-response
-    statistics — already parameterized by a `loc` region string and the
-    cached `fish_{n}_{loc}.npy` arrays). `Fig_3b_generate_processed_data.py`
-    generalizes both to loop over fish 0/1/2 × region (Cb/OT/IO), reusing the
-    same cached per-region dFF arrays for both panels — this makes region
-    selection fully code-reproducible (no manual per-fish cluster lookup),
-    unlike the original long-trial panel. The two trial-selection loops are
-    kept as faithful, separate copies of their respective source scripts
-    (the accept/reject filters genuinely differ between them — not a
-    refactor-safe merge).
+  - **The two panels use genuinely different data sources — do not merge
+    them.** Left (long-trial dynamics) uses **fish 0 only**, raw per-fish
+    selection straight from
+    `Notebooks/additional/Figure_3_dynamics/long_trial_ex_cluster_dynamics_Figure_4A.ipynb`
+    (`fsensory_cluster_label.npy` + `cell_state_pulse_filtered.npy` on fish
+    0) — this was corrected 2026-07-29 after first (wrongly) substituting
+    the cluster_dynamics cache here too. Right (pulse-response statistics)
+    uses `Figure_4DE_af_brain_cluster_at_swim_on.py`, aggregated across fish
+    0/1/2 via the cached `fish_{n}_{loc}.npy` arrays in
+    `/nrs/ahrens/Ziqiang/Jing_Glia_project/processed_af_data/cluster_dynamics/`.
+  - Region → `label_` for the left panel, confirmed via
+    `Notebooks/additional/cluster_dynamics/ex_brain_cluster_TL.ipynb`'s
+    comment ("4, IO; 9, OT; 10, SLoMO; 8, PT"): **OT=9, IO=4**. No
+    `fsensory_cluster_label` value for **Cb** was found in any notebook —
+    per the user's explicit call, Cb reuses **label_=10 (SLoMO) + its
+    z-filter** (`cells_center[cell_idx,2]` in `(1100,1500)`), the one region
+    this source notebook fully documents end-to-end. (IPN/PT were
+    considered but dropped for this panel — see the exchangeability note in
+    the memory file.)
+  - Right panel's per-region cache (`cluster_dynamics/`) has `Cb, IO, IPN,
+    LMO, NEMO, OT, PO, SLoMO, vTel` for fish 0/1/2/4 but **no `PT` for any
+    fish** — confirmed by listing the folder directly, not by inference.
   - Old pre-existing (non-reproducible) legacy figures for reference:
     `Notebooks/additional/Clusters/depreciated/Figure_4A Long_trial/population_dynamics_{Cb,IPN,OT,PT}_long.svg`
     and `Notebooks/additional/Clusters/figures/pulse_probe_int_{Cb,OT}.pdf`
