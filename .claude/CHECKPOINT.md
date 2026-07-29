@@ -136,11 +136,23 @@ environment/, metadata/                     -- empty; CodeOcean populates these 
   - Fig 4c display: no atlas background, `cmap='hot'`, `vmax=0.3, vmin=0`.
   - Fig 4d display: scatter `resp_est` vs `resp`, black=CL/red=OL, dashed
     identity line, axes 0–15s.
+- **`Figure_2bcdf_activity_plot.ipynb`** — for each of Fig 2b/2c/2d/2f, a
+  CL+OL activity heatmap (cells sorted by pulse/int/motor correlation)
+  followed by a CL (black) vs OL (red) trial-averaged trace (mean±sem).
+  Sources: `Notebooks/additional/Figure_2_brain_dynamics/Figure_2_brain_clusters_af_pulse_v2.ipynb`
+  (2b/2c/2d — loads two small precomputed caches, no raw per-fish data
+  needed) and `Figure_2_ex_motor_dynamics_v1.ipynb` (2f — needs one example
+  fish's raw trial data, row 2 in the datalist).
+  - Flagged, not resolved: the 2d (pulse-neg) trace's cell-selection
+    threshold, ported verbatim (`pulse_r < 0.05`), is far weaker than the
+    brain map's own `pulse_r < 0` cutoff — selects ~55% of all cells rather
+    than a clean negative subset. Still produces a visible CL-trial
+    suppression dip, not obviously broken, but worth a second look.
 
 ## Panel TODO list (work through one at a time)
 
 - [x] Fig 2bcdf: brain maps — `Figure_2bcdf_4f_brain_map.ipynb` (also covers 4f)
-- [ ] Fig 2bcdf: activity plot
+- [x] Fig 2bcdf: activity plot — `Figure_2bcdf_activity_plot.ipynb`
 - [ ] Fig 2bcdf: statistics
 - [ ] Fig 3b: example cluster activity plot and statistics
 - [ ] Fig 3cde: modulation depth
