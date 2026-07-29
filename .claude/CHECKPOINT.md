@@ -148,6 +148,21 @@ environment/, metadata/                     -- empty; CodeOcean populates these 
     brain map's own `pulse_r < 0` cutoff — selects ~55% of all cells rather
     than a clean negative subset. Still produces a visible CL-trial
     suppression dip, not obviously broken, but worth a second look.
+  - Heatmaps pin `cmap='rocket'` explicitly (`import seaborn as sns` is
+    enough to register the name, no need for `sns.set()`), and the
+    notebook's kernelspec was switched to the **`google_em`** conda env
+    (matplotlib 3.9.4) instead of `myenv` (matplotlib 3.10.8) — matplotlib
+    3.10 genuinely renders `rocket` less vibrantly than 3.9 for narrow
+    `vmin`/`vmax` ranges like this one. `google_em` already exists on this
+    machine (no install needed) and has a registered Jupyter kernel of the
+    same name.
+  - `plot_shade_err` moved out to `Notebooks/src/plotting_utils.py` — a
+    shared, non-figure-specific helper (first of its kind in `src/`),
+    imported via `sys.path.append('src')`. Reuse this for future notebooks
+    instead of redefining the function inline.
+  - `ex_premotor_dynamics_v1.ipynb` (in `Notebooks/additional/`) has the same
+    matplotlib-version vibrancy issue but has NOT been switched to
+    `google_em` yet — only this notebook has been fixed so far.
 
 ## Panel TODO list (work through one at a time)
 
