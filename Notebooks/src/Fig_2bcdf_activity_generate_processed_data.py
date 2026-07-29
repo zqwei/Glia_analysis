@@ -21,12 +21,12 @@ elsewhere in this project (e.g. Fig_4cd), then correlates against motor/pulse
 regressors already cached per-fish (cell_motor_corr.npz,
 cell_pulse_series_corr.npz).
 
-Note: the 2d (pulse-neg) trace panel's cell-selection threshold is ported
-verbatim from the source notebook: `p_r_thres = -0.05; pulse_r < -p_r_thres`,
-i.e. `pulse_r < 0.05` -- a much weaker cutoff than the brain map's own
-`pulse_r < 0` (see Fig_2bcdf_4f_generate_pulse_maps.py). Kept as-is since
-that's what the given source notebook does; flagged for the user to confirm
-this is intentional.
+Note: the 2d (pulse-neg) trace panel deliberately does NOT use the source
+notebook's own cell-selection threshold (`p_r_thres = -0.05; pulse_r <
+-p_r_thres`, i.e. `pulse_r < 0.05`), which was far weaker than the heatmap's
+own top-num_cells-most-negative selection (~55% of all cells vs. 5000). The
+trace instead reuses the exact same `sort_idx` as the heatmap immediately
+above it, per the user's explicit request.
 
 Run from this src/ folder: `python Fig_2bcdf_activity_generate_processed_data.py`.
 '''
@@ -63,12 +63,14 @@ out['pulse_pos_CL_trace'] = CL_dFF_list[pulse_r>p_r_thres]
 out['pulse_pos_OL_trace'] = OL_dFF_list[pulse_r>p_r_thres]
 
 # Fig 2d: pulse-position suppressed cells (negative)
+# trace uses the same cell selection as the heatmap (top num_cells most
+# negative pulse_r), rather than the source notebook's own much weaker
+# `pulse_r < 0.05` threshold (~55% of all cells) -- user's explicit call.
 sort_idx = np.argsort(pulse_r)[:num_cells]
 out['pulse_neg_CL_heatmap'] = zdat_[sort_idx][:, :40]
 out['pulse_neg_OL_heatmap'] = zdat_[sort_idx][:, 40:]
-p_r_thres = -0.05
-out['pulse_neg_CL_trace'] = CL_dFF_list[pulse_r<-p_r_thres]
-out['pulse_neg_OL_trace'] = OL_dFF_list[pulse_r<-p_r_thres]
+out['pulse_neg_CL_trace'] = CL_dFF_list[sort_idx]
+out['pulse_neg_OL_trace'] = OL_dFF_list[sort_idx]
 
 # Fig 2c: integrative cells (positive)
 num_cells = 6000
