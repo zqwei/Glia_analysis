@@ -23,6 +23,7 @@ figures/
 results/
 analyses_in_progress/
 *.ipynb
+Notebooks/additional
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
